@@ -7,6 +7,8 @@ const User = require("../models/user");
 require("dotenv").config();
 const crypto = require("crypto");
 
+const passport = require('passport');
+
 const router = express.Router();
 
 // Nodemailer Transporter for Sending Emails
@@ -24,11 +26,111 @@ const Stripe = require('stripe');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 
+
+
+
+
+
+// backend/routes/youtube.js
+
+
+const YOUTUBE_API_KEY = 'AIzaSyANtFlnweaSbUbDzNqn_5Het4Q7ZaK803w';
+
+const CX = "15c8815bd276e49c9"; // From Programmable Search Engine
+
+
+
+
+
+// GOOGLE
+router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+
+router.get("/google/callback", passport.authenticate("google", { failureRedirect: "/login" }), (req, res) => {
+  const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+  // Redirect to frontend with token and plan
+  res.redirect(`http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}`);
+});
+
+// LINKEDIN
+router.get("/linkedin", passport.authenticate("linkedin"));
+
+router.get("/linkedin/callback", passport.authenticate("linkedin", { failureRedirect: "/login" }), (req, res) => {
+  const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+  res.redirect(`http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}`);
+});
+
+
+
+router.get('/validate/videos', async (req, res) => {
+    const query = req.query.q;
+  if (!query) return res.status(400).json({ error: "Missing query" });
+
+  const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(
+    query
+  )}&cx=${CX}&key=${GOOGLE_API_KEY}`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+
+    const videos = (data.items || [])
+      .filter((item) => item.link.includes("youtube.com/watch"))
+      .map((item) => {
+        const videoId = extractYouTubeVideoId(item.link);
+        return {
+          title: item.title,
+          link: item.link,
+          thumbnail: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+        };
+      });
+
+    res.json({ videos });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch videos" });
+  }
+  // const videoId = req.query.videoId;
+
+  // if (!videoId) return res.status(400).json({ valid: false });
+
+  // try {
+  //   const response = await axios.get(
+  //     `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet,status&key=${YOUTUBE_API_KEY}`
+  //   );
+
+  //   const video = response.data.items[0];
+
+  //   if (
+  //     video &&
+  //     video.status.privacyStatus === 'public' &&
+  //     !video.snippet.title.toLowerCase().includes("music") &&
+  //     !video.snippet.title.toLowerCase().includes("shorts")
+  //   ) {
+  //     res.json({ valid: true, title: video.snippet.title });
+  //   } else {
+  //     res.json({ valid: false });
+  //   }
+  // } catch (error) {
+  //   res.status(500).json({ valid: false });
+  // }
+});
+
+function extractYouTubeVideoId(url) {
+  const regex =
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
+}
+// module.exports = router;
+
+
+
+
 // Create Checkout Session Route
 router.post("/api/billing/create-checkout-session", async (req, res) => {
-  console.log("heyy")
+  // console.log("heyy")
   try {
-    console.log("heyy111")
+    // console.log("heyy111")
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription",
@@ -48,7 +150,7 @@ router.post("/api/billing/create-checkout-session", async (req, res) => {
 
     res.json({ url: session.url });
   } catch (err) {
-    console.log("heyy222")
+    // console.log("heyy222")
     console.error("❌ Stripe Error:", err.message);
     res.status(500).json({ error: err.message });
   }
@@ -56,7 +158,7 @@ router.post("/api/billing/create-checkout-session", async (req, res) => {
 
 // Complete Checkout Route (for success page)
 router.post("/api/billing/complete-checkout", async (req, res) => {
-  console.log("hewellelelelooo")
+  // console.log("hewellelelelooo")
   const { sessionId } = req.body;
 
   try {
@@ -66,9 +168,9 @@ router.post("/api/billing/complete-checkout", async (req, res) => {
     // Get the plan from metadata (this is what we set during checkout)
     const plan = session.metadata.plan;
     const userEmail = session.customer_email;
-    console.log(userEmail)
-    console.log(plan)
-    console.log(userEmail)
+    // console.log(userEmail)
+    // console.log(plan)
+    // console.log(userEmail)
     // Find the user by email and update their plan
     const user = await User.findOneAndUpdate(
       { email: userEmail },
@@ -93,8 +195,8 @@ router.post("/api/billing/complete-checkout", async (req, res) => {
 // GET user plan by email
 router.post("/get-user-by-email", async (req, res) => {
   const { email } = req.body;
-  console.log("fdgdgjdjsdfgnbsdgb")
-  console.log(email)
+  // console.log("fdgdgjdjsdfgnbsdgb")
+  // console.log(email)
   try {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });

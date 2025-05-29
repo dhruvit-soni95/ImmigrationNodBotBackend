@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const messageSchema = new mongoose.Schema({
   sender: String,
   text: String,
+  createdAt: { type: Date, default: Date.now }, // ✅ ADD THIS LINE
 });
 
 const chatSchema = new mongoose.Schema({

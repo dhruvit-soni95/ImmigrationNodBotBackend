@@ -31,11 +31,54 @@ app.use(express.json());
 // const chatHistory = {};
 
 
+const cron = require("node-cron");
+const downloadLatestPdf = require("./downloadLatestPdf");
+
+(async () => {
+  try {
+    await downloadLatestPdf();
+    console.log("✅ PDF downloaded successfully.");
+  } catch (err) {
+    console.error("❌ PDF download failed:", err.message);
+  }
+})();
+// (async () => {
+//   console.log("📥 Downloading PDF once at startup...");
+//   await downloadLatestPdf();
+// })();
+
+// cron.schedule("* * * * *", () => {
+// // cron.schedule("0 3 * * *", () => {
+//   console.log("📥 Downloading daily PDF update...");
+//   downloadLatestPdf(PDF_URL, LOCAL_PATH);
+// });
+
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api", chatRoutes);
 
+// app.get("/download-pdf", async (req, res) => {
+//   try {
+//     await downloadLatestPdf();
+//     res.send("✅ PDF downloaded successfully.");
+//   } catch (err) {
+//     res.status(500).send("❌ PDF download failed: " + err.message);
+//   }
+// });
 
+require("./routes/passport"); // Load strategies
+const session = require("express-session");
+const passport = require("passport");
+
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.post("/api/user/saveDeveloperToken", async (req, res) => {
   const { userEmail, token } = req.body;
