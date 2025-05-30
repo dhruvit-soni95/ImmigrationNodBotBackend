@@ -506,6 +506,72 @@ router.post("/login", async (req, res) => {
 
 
 
+// router.post("/forgot-password", async (req, res) => {
+//   const { email } = req.body;
+
+//   if (!email) {
+//     return res.status(400).json({ message: "Email is required." });
+//   }
+
+//   try {
+//     const user = await User.findOne({ email });
+
+//     if (!user) {
+//       return res.status(404).json({ message: "No account found with this email." });
+//     }
+
+//     // 🔐 Generate token
+//     const token = crypto.randomBytes(32).toString("hex");
+
+//     user.resetToken = token;
+//     user.resetTokenExpires = Date.now() + 3600000; // Token valid for 1 hour
+
+//     await user.save();
+
+//     // 📩 Create reset link
+    
+//     // const resetLink = `http://localhost:3000/reset-password/${token}`;
+//     const resetLink = `http://146.148.96.159/reset-password/${token}`;
+
+//     // ✉️ Send Email
+//     const mailOptions = {
+//       from: process.env.EMAIL_USER,
+//       to: user.email,
+//       subject: "Reset Your Password",
+//       html: `
+//       <html>
+//         <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+//           <div style="max-width: 600px; margin: auto; background: #ffffff; padding: 20px; border-radius: 8px;">
+//             <h2 style="color: #333;">Hello ${user.name},</h2>
+//             <p style="color: #555;">We received a request to reset the password for your account. Please click the button below to reset your password:</p>
+//             <a href="http://146.148.96.159/reset-password/${token}" style="background-color: #4CAF50; color: white; padding: 14px 20px; text-align: center; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Reset Your Password</a>
+//             <p style="color: #555;">This link will expire in 1 hour. If you did not request a password reset, please ignore this email.</p>
+//             <p style="color: #555;">Thank you,<br/>The AI Chat Team</p>
+//           </div>
+//         </body>
+//       </html>`
+//     };
+//     // text: `Hello ${user.name},\n\nClick the link below to reset your password:\n\n${resetLink}\n\nThis link will expire in 1 hour.`,
+
+//     transporter.sendMail(mailOptions, (err, info) => {
+//       if (err) {
+//         console.error("Error sending reset email:", err);
+//         return res.status(500).json({ message: "Failed to send reset email." });
+//       }
+
+//       console.log("Reset email sent:", info.response);
+//       return res.status(200).json({ message: "Reset link sent to your email. just wait for few minutes." });
+//     });
+
+//   } catch (err) {
+//     console.error("Forgot password error:", err);
+//     return res.status(500).json({ message: "Server error. Please try again later." });
+//   }
+// });
+
+
+// const crypto = require("crypto");
+
 router.post("/forgot-password", async (req, res) => {
   const { email } = req.body;
 
@@ -520,54 +586,45 @@ router.post("/forgot-password", async (req, res) => {
       return res.status(404).json({ message: "No account found with this email." });
     }
 
-    // 🔐 Generate token
     const token = crypto.randomBytes(32).toString("hex");
 
     user.resetToken = token;
-    user.resetTokenExpires = Date.now() + 3600000; // Token valid for 1 hour
+    user.resetTokenExpires = Date.now() + 3600000;
 
     await user.save();
 
-    // 📩 Create reset link
-    
-    // const resetLink = `http://localhost:3000/reset-password/${token}`;
-    const resetLink = `http://146.148.96.159/reset-password/${token}`;
+    const resetLink = `https://www.immigrategpt.ca/reset-password/${token}`;
+    // const resetLink = `http://146.148.96.159/reset-password/${token}`;
 
-    // ✉️ Send Email
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: user.email,
-      subject: "Reset Your Password",
+      subject: "Reset Your Password - AI Chat",
       html: `
-      <html>
-        <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
-          <div style="max-width: 600px; margin: auto; background: #ffffff; padding: 20px; border-radius: 8px;">
-            <h2 style="color: #333;">Hello ${user.name},</h2>
-            <p style="color: #555;">We received a request to reset the password for your account. Please click the button below to reset your password:</p>
-            <a href="http://146.148.96.159/reset-password/${token}" style="background-color: #4CAF50; color: white; padding: 14px 20px; text-align: center; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Reset Your Password</a>
-            <p style="color: #555;">This link will expire in 1 hour. If you did not request a password reset, please ignore this email.</p>
-            <p style="color: #555;">Thank you,<br/>The AI Chat Team</p>
-          </div>
-        </body>
-      </html>`
+        <html>
+          <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+            <div style="max-width: 600px; margin: auto; background: #ffffff; padding: 20px; border-radius: 8px;">
+              <h2 style="color: #333;">Hello ${user.name},</h2>
+              <p style="color: #555;">We received a request to reset the password for your account. Please click the button below to reset your password:</p>
+              <a href="${resetLink}" style="background-color: #4CAF50; color: white; padding: 14px 20px; text-align: center; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Reset Your Password</a>
+              <p style="color: #555;">This link will expire in 1 hour. If you did not request a password reset, please ignore this email.</p>
+              <p style="color: #555;">Thank you,<br/>The AI Chat Team</p>
+            </div>
+          </body>
+        </html>`
     };
-    // text: `Hello ${user.name},\n\nClick the link below to reset your password:\n\n${resetLink}\n\nThis link will expire in 1 hour.`,
 
-    transporter.sendMail(mailOptions, (err, info) => {
-      if (err) {
-        console.error("Error sending reset email:", err);
-        return res.status(500).json({ message: "Failed to send reset email." });
-      }
-
-      console.log("Reset email sent:", info.response);
-      return res.status(200).json({ message: "Reset link sent to your email. just wait for few minutes." });
-    });
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Reset email sent:", info.response);
+    return res.status(200).json({ message: "Reset link sent to your email." });
 
   } catch (err) {
     console.error("Forgot password error:", err);
     return res.status(500).json({ message: "Server error. Please try again later." });
   }
 });
+
+
 
 
 

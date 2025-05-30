@@ -305,154 +305,172 @@ async function fetchRelevantPdfContent(query) {
 //   });
 // }
 
-router.post("/chat", async (req, res) => {
-  try {
-    const { message, chatId, userEmail } = req.body;
+// router.post("/chat", async (req, res) => {
+//   try {
+//     const { message, chatId, userEmail } = req.body;
 
-    if (!message || !chatId || !userEmail) {
-      return res
-        .status(400)
-        .json({ error: "Missing message, chatId, or userEmail" });
-    }
+//     if (!message || !chatId || !userEmail) {
+//       return res
+//         .status(400)
+//         .json({ error: "Missing message, chatId, or userEmail" });
+//     }
 
-    // Initialize chatHistory if needed from DB
-    if (!chatHistory[chatId]) {
-      const existingUserChat = await Chat.findOne({ userEmail });
-      const existingChat = existingUserChat?.chats.find((c) => c.id === chatId);
+//     // Initialize chatHistory if needed from DB
+//     if (!chatHistory[chatId]) {
+//       const existingUserChat = await Chat.findOne({ userEmail });
+//       const existingChat = existingUserChat?.chats.find((c) => c.id === chatId);
 
-      chatHistory[chatId] = existingChat
-        ? existingChat.messages.map((m) => ({
-            role: m.sender === "user" ? "user" : "assistant",
-            content: m.text,
-          }))
-        : [];
-    }
+//       chatHistory[chatId] = existingChat
+//         ? existingChat.messages.map((m) => ({
+//             role: m.sender === "user" ? "user" : "assistant",
+//             content: m.text,
+//           }))
+//         : [];
+//     }
 
-    // Add current user message to chat history
-    chatHistory[chatId].push({ role: "user", content: message });
+//     // Add current user message to chat history
+//     chatHistory[chatId].push({ role: "user", content: message });
 
-    // Fetch RAG contexts
-    const webContext = await fetchGoogleSearchSnippets(message);
-    const pdfContext = await fetchRelevantPdfContent(message);
+//     // Fetch RAG contexts
+//     const webContext = await fetchGoogleSearchSnippets(message);
+//     const pdfContext = await fetchRelevantPdfContent(message);
 
-    let combinedContext = "";
-    if (webContext) {
-      combinedContext += `--- Google 2025 Web Search ---\n${webContext}\n\n`;
-    }
-    if (pdfContext) {
-      combinedContext += `--- PDF 2025 Documents ---\n${pdfContext}`;
-    }
+//     let combinedContext = "";
+//     if (webContext) {
+//       combinedContext += `--- Google 2025 Web Search ---\n${webContext}\n\n`;
+//     }
+//     if (pdfContext) {
+//       combinedContext += `--- PDF 2025 Documents ---\n${pdfContext}`;
+//     }
 
-    console.log("🌐 Web Context Fetched:\n", webContext || "❌ No web context found.");
-    console.log("📄 Injected System Context:\n", combinedContext);
+//     console.log("🌐 Web Context Fetched:\n", webContext || "❌ No web context found.");
+//     console.log("📄 Injected System Context:\n", combinedContext);
 
-    // Build single system prompt
-    // let systemPrompt = `You are an expert in Canadian immigration, work permits, study guides, and visa rules. Use ONLY reliable, current information from the year 2025. Answer strictly about Canadian immigration-related topics. If the user requests, provide relevant web or YouTube links related to the topic. and also give long details if user want again or some some related topic\n\n`;
-    let systemPrompt = `You are an expert in Canadian immigration, work permits, study guides, and visa rules. Use ONLY reliable, current information from the year 2025. Answer strictly about Canadian immigration-related topics. If the user requests, provide relevant web or YouTube links related to the topic, and give long, detailed responses when asked for follow-ups or related topics.
+//     // Build single system prompt
+//     // let systemPrompt = `You are an expert in Canadian immigration, work permits, study guides, and visa rules. Use ONLY reliable, current information from the year 2025. Answer strictly about Canadian immigration-related topics. If the user requests, provide relevant web or YouTube links related to the topic. and also give long details if user want again or some some related topic\n\n`;
+//     let systemPrompt = `You are an expert in Canadian immigration, work permits, study guides, and visa rules. Use ONLY reliable, current information from the year 2025. Answer strictly about Canadian immigration-related topics. If the user requests, provide relevant web or YouTube links related to the topic, and give long, detailed responses when asked for follow-ups or related topics.
 
-Do not disclose anything about yourself, your identity, how you were built, what technologies or models you use, or any implementation details. Politely decline to answer any non-immigration-related or personal questions.`;
+// Do not disclose anything about yourself, your identity, how you were built, what technologies or models you use, or any implementation details. Politely decline to answer any non-immigration-related or personal questions.`;
 
 
-    if (combinedContext.trim()) {
-      systemPrompt += `--- Injected 2025 Context (from Web & PDF) ---\n${combinedContext}\n\n`;
-    }
+//     if (combinedContext.trim()) {
+//       systemPrompt += `--- Injected 2025 Context (from Web & PDF) ---\n${combinedContext}\n\n`;
+//     }
 
-    // Prepare messages for OpenAI: system + conversation history (user & assistant only)
-    const messages = [
-      { role: "system", content: systemPrompt },
-      ...chatHistory[chatId].filter(m => m.role !== "system"),
-      // current user message is already in chatHistory
-    ];
+//     // Prepare messages for OpenAI: system + conversation history (user & assistant only)
+//     const messages = [
+//       { role: "system", content: systemPrompt },
+//       ...chatHistory[chatId].filter(m => m.role !== "system"),
+//       // current user message is already in chatHistory
+//     ];
 
-    // Call OpenAI Chat Completion API
-    const aiResponse = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        model: "gpt-3.5-turbo",
-        temperature: 0.3,
-        messages,
-      },
-      {
-        headers: {
-          Authorization: `Bearer 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`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+//     // Call OpenAI Chat Completion API
+//     // const aiResponse = await axios.post(
+//     //   "https://api.openai.com/v1/chat/completions",
+//     //   {
+//     //     model: "gpt-3.5-turbo",
+//     //     temperature: 0.3,
+//     //     messages,
+//     //   },
+//     //   {
+//     //     headers: {
+//     //       Authorization: `Bearer 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`,
+//     //       "Content-Type": "application/json",
+//     //     },
+//     //   }
+//     // );
 
-    const botMessage = aiResponse.data?.choices?.[0]?.message?.content?.trim();
 
-    if (!botMessage) {
-      return res.status(500).json({ error: "Invalid AI response" });
-    }
+//         const payload = {
+//       model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+//       temperature: 0.3,
+//       messages: chatHistory[chatId],
+//     };
 
-    // Add assistant reply to chat history
-    chatHistory[chatId].push({ role: "assistant", content: botMessage });
+//     const aiResponse = await axios.post(
+//       "https://api.together.xyz/v1/chat/completions",
+//       payload,
+//       {
+//         headers: {
+//           Authorization: `Bearer ${TOGETHER_AI_API_KEY}`,
+//           "Content-Type": "application/json",
+//         },
+//       }
+//     );
 
-    // Prepare messages for DB (filter out system messages)
-    const cleanedMessages = chatHistory[chatId].filter(m => m.role !== "system");
-    // const formattedMessages = cleanedMessages.map(m => ({
-    //   sender: m.role === "user" ? "user" : "bot",
-    //   text: m.content,
-    // }));
-    const formattedMessages = cleanedMessages.map((m) => ({
-      sender: m.role === "user" ? "user" : "bot",
-      text: m.content,
-      createdAt: m.createdAt || new Date(), // ✅ Keep original time if exists
-    }));
+//     const botMessage = aiResponse.data?.choices?.[0]?.message?.content?.trim();
 
-    // Create chat title from first user message
-    const firstUserMessage = cleanedMessages.find(m => m.role === "user");
-    const title = firstUserMessage?.content
-      ? firstUserMessage.content.length > 25
-        ? firstUserMessage.content.slice(0, 25) + "..."
-        : firstUserMessage.content
-      : "New Chat";
+//     if (!botMessage) {
+//       return res.status(500).json({ error: "Invalid AI response" });
+//     }
 
-    // Save or update chat in DB
-    let userDoc = await Chat.findOne({ userEmail });
+//     // Add assistant reply to chat history
+//     chatHistory[chatId].push({ role: "assistant", content: botMessage });
 
-    if (userDoc) {
-      const chatIndex = userDoc.chats.findIndex(c => c.id === chatId);
-      if (chatIndex !== -1) {
-        // Update existing chat
-        userDoc.chats[chatIndex].messages = formattedMessages;
-        userDoc.chats[chatIndex].name = title;
-      } else {
-        // Add new chat
-        userDoc.chats.push({
-          id: chatId,
-          name: title,
-          messages: formattedMessages,
-          isTemp: false,
-          createdAt: new Date(),
-        });
-      }
-      userDoc.markModified("chats");
-      await userDoc.save();
-    } else {
-      // New user document
-      const newUserChat = new Chat({
-        userEmail,
-        chats: [
-          {
-            id: chatId,
-            name: title,
-            messages: formattedMessages,
-            isTemp: false,
-            createdAt: new Date(),
-          },
-        ],
-      });
-      await newUserChat.save();
-    }
+//     // Prepare messages for DB (filter out system messages)
+//     const cleanedMessages = chatHistory[chatId].filter(m => m.role !== "system");
+//     // const formattedMessages = cleanedMessages.map(m => ({
+//     //   sender: m.role === "user" ? "user" : "bot",
+//     //   text: m.content,
+//     // }));
+//     const formattedMessages = cleanedMessages.map((m) => ({
+//       sender: m.role === "user" ? "user" : "bot",
+//       text: m.content,
+//       createdAt: m.createdAt || new Date(), // ✅ Keep original time if exists
+//     }));
 
-    res.json({ response: botMessage });
-  } catch (error) {
-    console.error("❌ Chat Error:", error.response?.data || error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+//     // Create chat title from first user message
+//     const firstUserMessage = cleanedMessages.find(m => m.role === "user");
+//     const title = firstUserMessage?.content
+//       ? firstUserMessage.content.length > 25
+//         ? firstUserMessage.content.slice(0, 25) + "..."
+//         : firstUserMessage.content
+//       : "New Chat";
+
+//     // Save or update chat in DB
+//     let userDoc = await Chat.findOne({ userEmail });
+
+//     if (userDoc) {
+//       const chatIndex = userDoc.chats.findIndex(c => c.id === chatId);
+//       if (chatIndex !== -1) {
+//         // Update existing chat
+//         userDoc.chats[chatIndex].messages = formattedMessages;
+//         userDoc.chats[chatIndex].name = title;
+//       } else {
+//         // Add new chat
+//         userDoc.chats.push({
+//           id: chatId,
+//           name: title,
+//           messages: formattedMessages,
+//           isTemp: false,
+//           createdAt: new Date(),
+//         });
+//       }
+//       userDoc.markModified("chats");
+//       await userDoc.save();
+//     } else {
+//       // New user document
+//       const newUserChat = new Chat({
+//         userEmail,
+//         chats: [
+//           {
+//             id: chatId,
+//             name: title,
+//             messages: formattedMessages,
+//             isTemp: false,
+//             createdAt: new Date(),
+//           },
+//         ],
+//       });
+//       await newUserChat.save();
+//     }
+
+//     res.json({ response: botMessage });
+//   } catch (error) {
+//     console.error("❌ Chat Error:", error.response?.data || error.message);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
 
 
 
@@ -782,16 +800,34 @@ Do not disclose anything about yourself, your identity, how you were built, what
 //     ];
 
 //     // Call OpenAI API
+//     // const aiResponse = await axios.post(
+//     //   "https://api.openai.com/v1/chat/completions",
+//     //   {
+//     //     model: "gpt-3.5-turbo",
+//     //     temperature: 0.3,
+//     //     messages,
+//     //   },
+//     //   {
+//     //     headers: {
+//     //       Authorization: `Bearer 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`,
+//     //       "Content-Type": "application/json",
+//     //     },
+//     //   }
+//     // );
+
+
+//             const payload = {
+//       model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+//       temperature: 0.3,
+//       messages: chatHistory[chatId],
+//     };
+
 //     const aiResponse = await axios.post(
-//       "https://api.openai.com/v1/chat/completions",
-//       {
-//         model: "gpt-3.5-turbo",
-//         temperature: 0.3,
-//         messages,
-//       },
+//       "https://api.together.xyz/v1/chat/completions",
+//       payload,
 //       {
 //         headers: {
-//           Authorization: `Bearer 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`,
+//           Authorization: `Bearer ${TOGETHER_AI_API_KEY}`,
 //           "Content-Type": "application/json",
 //         },
 //       }
@@ -1011,6 +1047,152 @@ Do not disclose anything about yourself, your identity, how you were built, what
 //   }
 // });
 
+
+router.post("/chat", async (req, res) => {
+  try {
+    const { message, chatId, userEmail } = req.body;
+
+    if (!message || !chatId || !userEmail) {
+      return res.status(400).json({ error: "Missing message, chatId, or userEmail" });
+    }
+
+    // 🧠 Rebuild chat history from DB each time for accuracy
+    const userChatDoc = await Chat.findOne({ userEmail });
+    const existingChat = userChatDoc?.chats.find((c) => c.id === chatId);
+
+    const messages = existingChat
+      ? existingChat.messages.map((m) => ({
+          role: m.sender === "user" ? "user" : "assistant",
+          content: m.text,
+        }))
+      : [];
+
+    // Add system prompt
+    messages.unshift({
+      role: "system",
+      content:
+        "You are an expert in Canadian immigration. Use reliable information and stay current. This is year 2025. Give information latest 2025. Always give 2025 latest information. And if user want web links or youtube video link related to topic please give links",
+    });
+
+    // Add user message
+    messages.push({ role: "user", content: message });
+
+    // 📡 Get RAG content
+    const webContext = await fetchGoogleSearchSnippets(message);
+    const pdfContext = await fetchRelevantPdfContent(message);
+
+    let combinedContext = "";
+    if (webContext) {
+      combinedContext += `--- Google 2025 Web Search ---\n${webContext}\n\n`;
+    }
+    if (pdfContext) {
+      combinedContext += `--- PDF 2025 Documents ---\n${pdfContext}`;
+    }
+    let systemPrompt = `You are an expert in Canadian immigration, work permits, study guides, and visa rules. Use ONLY reliable, current information from the year 2025. Answer strictly about Canadian immigration-related topics. If the user requests, provide relevant web or YouTube links related to the topic, and give long, detailed responses when asked for follow-ups or related topics.
+      Do not disclose anything about yourself, your identity, how you were built, what technologies or models you use, or any implementation details. Politely decline to answer any non-immigration-related or personal questions.`;
+
+    if (combinedContext.trim()) {
+      systemPrompt += `--- Injected 2025 Context (from Web & PDF) ---\n${combinedContext}\n\n`;
+    }
+
+    if (combinedContext.trim()) {
+      messages.push({
+        role: "system",
+        content: systemPrompt,
+      });
+    }
+    // if (combinedContext.trim()) {
+    //   messages.push({
+    //     role: "system",
+    //     content: `Use the following 2025 context (from web and PDF) to answer strictly with the latest information. Prioritize this context over your own knowledge:\n\n${combinedContext}`,
+    //   });
+    // }
+
+
+    // 🤖 AI response
+    const payload = {
+      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      temperature: 0.3,
+      messages,
+    };
+
+    const aiResponse = await axios.post(
+      "https://api.together.xyz/v1/chat/completions",
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${TOGETHER_AI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const botMessage = aiResponse.data?.choices?.[0]?.message?.content?.trim();
+    if (!botMessage) {
+      return res.status(500).json({ error: "Invalid AI response" });
+    }
+
+    // 📦 Save to MongoDB using $push (atomic, no overwrite)
+    const newMessages = [
+      { sender: "user", text: message },
+      { sender: "bot", text: botMessage },
+    ];
+
+    // const chatTitle = message.length > 25 ? message.slice(0, 25) + "..." : message;
+
+    // const updateResult = await Chat.updateOne(
+    //   { userEmail, "chats.id": chatId },
+    //   {
+    //     $set: { "chats.$.name": chatTitle },
+    //     $push: { "chats.$.messages": { $each: newMessages } },
+    //   }
+    // );
+    const chatTitle = message.length > 25 ? message.slice(0, 25) + "..." : message;
+
+// Check if chat already exists and has a name
+const existingChatDoc = await Chat.findOne({ userEmail, "chats.id": chatId }, { "chats.$": 1 });
+const existingChat1 = existingChatDoc?.chats?.[0];
+
+const updateQuery = {
+  $push: { "chats.$.messages": { $each: newMessages } },
+};
+
+if (!existingChat1?.name) {
+  updateQuery.$set = { "chats.$.name": chatTitle };
+}
+
+const updateResult = await Chat.updateOne(
+  { userEmail, "chats.id": chatId },
+  updateQuery
+);
+
+
+    // 🆕 If chat not found, create new one
+    if (updateResult.matchedCount === 0) {
+      await Chat.updateOne(
+        { userEmail },
+        {
+          $push: {
+            chats: {
+              id: chatId,
+              name: chatTitle,
+              messages: newMessages,
+              isTemp: false,
+              createdAt: new Date(),
+            },
+          },
+        },
+        { upsert: true }
+      );
+    }
+
+    res.json({ response: botMessage });
+  } catch (error) {
+    console.error("❌ Chat Error:", error.response?.data || error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 const chatHistoryShared = {};
 
 router.post("/shared/chat", async (req, res) => {
@@ -1228,6 +1410,51 @@ router.delete("/chat/deleteChat", async (req, res) => {
 //   }
 // });
 
+// router.post("/chat/chatCountToday", async (req, res) => {
+//   const { userEmail } = req.body;
+
+//   // Get start of today in UTC to avoid timezone bugs
+//   const now = new Date();
+//   const startOfDay = new Date(
+//     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+//   );
+
+//   try {
+//     const user = await User.findOne({ email: userEmail });
+//     if (!user) {
+//       return res.status(200).json({ count: 0, plan: "Free" });
+//     }
+
+//     const userChat = await Chat.findOne({ userEmail });
+
+//     let messageCountToday = 0;
+
+//     if (userChat?.chats?.length) {
+//       for (const chat of userChat.chats) {
+//         for (const msg of chat.messages || []) {
+//           if (
+//             msg.sender === "user" &&
+//             msg.createdAt &&
+//             new Date(msg.createdAt) >= startOfDay
+//           ) {
+//             messageCountToday++;
+//           }
+//         }
+//       }
+//     }
+
+//     console.log(`User: ${userEmail} - Messages Today: ${messageCountToday}`);
+
+//     return res.json({
+//       count: messageCountToday,
+//       plan: user.plan || "Free",
+//     });
+//   } catch (error) {
+//     console.error("Error in /chat/chatCountToday:", error);
+//     return res.status(500).json({ message: "Server error" });
+//   }
+// });
+
 router.post("/chat/chatCountToday", async (req, res) => {
   const { userEmail } = req.body;
 
@@ -1243,6 +1470,25 @@ router.post("/chat/chatCountToday", async (req, res) => {
       return res.status(200).json({ count: 0, plan: "Free" });
     }
 
+    // ✅ Check if developer token is valid
+    if (
+      user.developerToken &&
+      user.developerToken.token === "paramsolutions369!" &&
+      user.developerToken.createdAt
+    ) {
+      const tokenCreated = new Date(user.developerToken.createdAt);
+      const tokenAge = (now - tokenCreated) / (1000 * 60 * 60 * 24); // in days
+
+      if (tokenAge <= 30) {
+        // Developer token is valid → return unlimited access
+        return res.json({
+          count: 0, // you can also send `messageCountToday` if needed
+          plan: "Developer",
+        });
+      }
+    }
+
+    // ⏳ Regular plan logic
     const userChat = await Chat.findOne({ userEmail });
 
     let messageCountToday = 0;
@@ -1266,12 +1512,14 @@ router.post("/chat/chatCountToday", async (req, res) => {
     return res.json({
       count: messageCountToday,
       plan: user.plan || "Free",
+      serverTimeUTC: new Date().toISOString(), // ⏱️ Send server time in UTC
     });
   } catch (error) {
     console.error("Error in /chat/chatCountToday:", error);
     return res.status(500).json({ message: "Server error" });
   }
 });
+
 
 // Endpoint to get the user's current plan
 router.get("/current-plan", async (req, res) => {
