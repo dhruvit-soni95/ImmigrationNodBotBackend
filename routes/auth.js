@@ -43,20 +43,110 @@ const CX = "15c8815bd276e49c9"; // From Programmable Search Engine
 
 
 // GOOGLE
+// router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+
+// router.get("/google/callback", passport.authenticate("google", { failureRedirect: "/signup" }), (req, res) => {
+//   const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+//   // Redirect to frontend with token and plan
+//   res.redirect(`http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}`);
+// });
+
+// router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+
+// router.get(
+//   "/google/callback",
+//   passport.authenticate("google", {
+//     failureRedirect: "http://localhost:3000/signup"
+//   }),
+//   (req, res) => {
+//     const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+
+//     // Redirect to frontend with token and info
+//     res.redirect(`http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}&email=${req.user.email}`);
+//   }
+// );
+
+
+
+// https://www.immigrategpt.ca/
+// Initiate Google login
 router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
 
-router.get("/google/callback", passport.authenticate("google", { failureRedirect: "/login" }), (req, res) => {
-  const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-  // Redirect to frontend with token and plan
-  res.redirect(`http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}`);
-});
+// Callback route after Google login
+router.get(
+  "/google/callback",
+  passport.authenticate("google", {
+    failureRedirect: "https://www.immigrategpt.ca/signup", // Redirect if auth fails
+    // failureRedirect: "http://localhost:3000/signup", // Redirect if auth fails
+    session: false, // Important: disable session if using JWT
+  }),
+  (req, res) => {
+    try {
+      // Generate JWT
+      const token = jwt.sign(
+        { userId: req.user._id, email: req.user.email },
+        process.env.JWT_SECRET,
+        { expiresIn: "1h" }
+      );
+
+      // Redirect to frontend with token and basic user info
+      res.redirect(
+        `https://www.immigrategpt.ca/oauth-success?token=${token}&plan=${req.user.plan}&email=${req.user.email}`
+      );
+      // res.redirect(
+      //   `http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}&email=${req.user.email}`
+      // );
+    } catch (err) {
+      console.error("OAuth callback error:", err);
+      res.redirect("https://www.immigrategpt.ca/signup?error=oauth_failed");
+      // res.redirect("http://localhost:3000/signup?error=oauth_failed");
+    }
+  }
+);
+
+
+
+// Redirect user to Facebook for login
+router.get("/facebook", passport.authenticate("facebook", { scope: ["email"] }));
+
+// Handle callback after Facebook login
+router.get(
+  "/facebook/callback",
+  passport.authenticate("facebook", {
+    failureRedirect: "https://www.immigrategpt.ca/signup",
+    // failureRedirect: "http://localhost:3000/signup",
+    session: false,
+  }),
+  (req, res) => {
+    try {
+      const token = jwt.sign(
+        { userId: req.user._id, email: req.user.email },
+        process.env.JWT_SECRET,
+        { expiresIn: "1h" }
+      );
+
+      res.redirect(
+        `https://www.immigrategpt.ca/oauth-success?token=${token}&plan=${req.user.plan}&email=${req.user.email}`
+      );
+      // res.redirect(
+      //   `http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}&email=${req.user.email}`
+      // );
+    } catch (err) {
+      console.error("OAuth callback error:", err);
+      res.redirect("https://www.immigrategpt.ca/signup?error=oauth_failed");
+      // res.redirect("http://localhost:3000/signup?error=oauth_failed");
+    }
+  }
+);
+
 
 // LINKEDIN
 router.get("/linkedin", passport.authenticate("linkedin"));
 
 router.get("/linkedin/callback", passport.authenticate("linkedin", { failureRedirect: "/login" }), (req, res) => {
   const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-  res.redirect(`http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}`);
+  res.redirect(`https://www.immigrategpt.ca/oauth-success?token=${token}&plan=${req.user.plan}`);
+  // res.redirect(`http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}`);
 });
 
 
@@ -616,7 +706,7 @@ router.post("/forgot-password", async (req, res) => {
 
     const info = await transporter.sendMail(mailOptions);
     console.log("Reset email sent:", info.response);
-    return res.status(200).json({ message: "Reset link sent to your email." });
+    return res.status(200).json({ message: "Reset link sent to your email. just wait for few minutes(It may take 5-10 minutes)." });
 
   } catch (err) {
     console.error("Forgot password error:", err);

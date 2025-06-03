@@ -54,6 +54,19 @@ const downloadLatestPdf = require("./downloadLatestPdf");
 // });
 
 
+require("./routes/passport"); // Load strategies
+const session = require("express-session");
+const passport = require("passport");
+
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api", chatRoutes);
@@ -67,18 +80,8 @@ app.use("/api", chatRoutes);
 //   }
 // });
 
-require("./routes/passport"); // Load strategies
-const session = require("express-session");
-const passport = require("passport");
 
-app.use(session({
-  secret: process.env.SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-}));
 
-app.use(passport.initialize());
-app.use(passport.session());
 
 app.post("/api/user/saveDeveloperToken", async (req, res) => {
   const { userEmail, token } = req.body;
