@@ -6,11 +6,8 @@ const nodemailer = require("nodemailer");
 const User = require("../models/user");
 require("dotenv").config();
 const crypto = require("crypto");
-
 const passport = require('passport');
-
 const router = express.Router();
-
 // Nodemailer Transporter for Sending Emails
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -19,56 +16,12 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS, // App password from .env
   },
 });
-
 const bodyParser = require("body-parser");
-
 const Stripe = require('stripe');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
-
-
-
-
-
-
-
-// backend/routes/youtube.js
-
-
 const YOUTUBE_API_KEY = 'AIzaSyANtFlnweaSbUbDzNqn_5Het4Q7ZaK803w';
-
 const CX = "15c8815bd276e49c9"; // From Programmable Search Engine
 
-
-
-
-
-// GOOGLE
-// router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
-
-// router.get("/google/callback", passport.authenticate("google", { failureRedirect: "/signup" }), (req, res) => {
-//   const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-//   // Redirect to frontend with token and plan
-//   res.redirect(`http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}`);
-// });
-
-// router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
-
-// router.get(
-//   "/google/callback",
-//   passport.authenticate("google", {
-//     failureRedirect: "http://localhost:3000/signup"
-//   }),
-//   (req, res) => {
-//     const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-
-//     // Redirect to frontend with token and info
-//     res.redirect(`http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}&email=${req.user.email}`);
-//   }
-// );
-
-
-
-// https://www.immigrategpt.ca/
 // Initiate Google login
 router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
 
@@ -140,14 +93,168 @@ router.get(
 );
 
 
-// LINKEDIN
-router.get("/linkedin", passport.authenticate("linkedin"));
 
-router.get("/linkedin/callback", passport.authenticate("linkedin", { failureRedirect: "/login" }), (req, res) => {
-  const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-  res.redirect(`https://www.immigrategpt.ca/oauth-success?token=${token}&plan=${req.user.plan}`);
-  // res.redirect(`http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}`);
-});
+// LinkedIn Auth Start
+router.get(
+  "/linkedin",
+  passport.authenticate("linkedin", { scope: ["r_emailaddress", "r_liteprofile"] })
+);
+
+// LinkedIn Auth Callback
+router.get(
+  "/linkedin/callback",
+  passport.authenticate("linkedin", {
+    failureRedirect: "https://www.immigrategpt.ca/signup",
+    session: false,
+  }),
+  (req, res) => {
+    try {
+      const token = jwt.sign(
+        { userId: req.user._id, email: req.user.email },
+        process.env.JWT_SECRET,
+        { expiresIn: "1h" }
+      );
+
+      res.redirect(
+        `https://www.immigrategpt.ca/oauth-success?token=${token}&plan=${req.user.plan}&email=${req.user.email}`
+      );
+    } catch (err) {
+      console.error("LinkedIn OAuth callback error:", err);
+      res.redirect("https://www.immigrategpt.ca/signup?error=oauth_failed");
+    }
+  }
+);
+
+
+// Redirect user to Microsoft login
+router.get('/microsoft', passport.authenticate('azuread-openidconnect', {
+  failureRedirect: 'https://www.immigrategpt.ca/signup',
+  // failureRedirect: 'http://localhost:3000/signup',
+}));
+
+// Callback route after Microsoft login
+router.get('/microsoft/callback',
+  passport.authenticate('azuread-openidconnect', {
+    failureRedirect: 'https://www.immigrategpt.ca/signup',
+    // failureRedirect: 'http://localhost:3000/signup',
+    session: false,
+  }),
+  (req, res) => {
+    try {
+      const token = jwt.sign(
+        { userId: req.user._id, email: req.user.email },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+
+      res.redirect(`https://www.immigrategpt.ca/oauth-success?token=${token}&plan=${req.user.plan}&email=${req.user.email}`);
+      // res.redirect(`http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}&email=${req.user.email}`);
+    } catch (err) {
+      console.error('OAuth callback error:', err);
+      res.redirect('https://www.immigrategpt.ca/signup?error=oauth_failed');
+      // res.redirect('http://localhost:3000/signup?error=oauth_failed');
+    }
+  }
+);
+
+
+
+// // Redirect user to Microsoft login
+// router.get("/microsoft", passport.authenticate("azuread-openidconnect", {
+// failureRedirect: "http://localhost:3000/signup?error=microsoft_oauth_failed",
+//   // failureRedirect: "https://www.immigrategpt.ca/signup",
+//   scope: ['openid', 'profile', 'email'],
+// }));
+
+// // Callback route after Microsoft login
+
+// router.get(
+//   "/microsoft/callback",
+//   (req, res, next) => {
+//     passport.authenticate("azuread-openidconnect", (err, user, info) => {
+//       if (err) {
+//         console.error("❌ Microsoft Auth Error:", err);
+//         return res.redirect("http://localhost:3000/signup?error=oauth_internal_error");
+//       }
+
+//       if (!user) {
+//         console.warn("⚠️ No user returned from Microsoft strategy");
+//         return res.redirect("http://localhost:3000/signup?error=no_user");
+//       }
+
+//       try {
+//         const token = jwt.sign(
+//           { userId: user._id, email: user.email },
+//           process.env.JWT_SECRET,
+//           { expiresIn: "1h" }
+//         );
+
+//         return res.redirect(
+//           `http://localhost:3000/oauth-success?token=${token}&plan=${user.plan}&email=${user.email}`
+//         );
+//       } catch (e) {
+//         console.error("❌ Token Generation Error:", e);
+//         return res.redirect("http://localhost:3000/signup?error=token_error");
+//       }
+//     })(req, res, next);
+//   }
+// );
+
+
+
+
+// router.get(
+//   "/microsoft/callback",
+//   passport.authenticate("azuread-openidconnect", {
+//     failureRedirect: "http://localhost:3000/signup",
+//     // failureRedirect: "https://www.immigrategpt.ca/signup",
+//     session: false,
+//   }),
+//   (req, res) => {
+//     try {
+//       const token = jwt.sign(
+//         { userId: req.user._id, email: req.user.email },
+//         process.env.JWT_SECRET,
+//         { expiresIn: "1h" }
+//       );
+
+//       res.redirect(
+//         `http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}&email=${req.user.email}`
+//       );
+//       // res.redirect(
+//       //   `https://www.immigrategpt.ca/oauth-success?token=${token}&plan=${req.user.plan}&email=${req.user.email}`
+//       // );
+//     } catch (err) {
+//       console.error("OAuth callback error:", err);
+//       res.redirect("http://localhost:3000/signup?error=oauth_failed");
+//       // res.redirect("https://www.immigrategpt.ca/signup?error=oauth_failed");
+//     }
+//   }
+// );
+
+// router.get("/microsoft",
+//   passport.authenticate("azuread-openidconnect", {
+//     failureRedirect: "http://localhost:3000/signup",
+//     session: false
+//   })
+// );
+
+// router.get("/microsoft/callback",
+//   passport.authenticate("azuread-openidconnect", {
+//     failureRedirect: "http://localhost:3000/signup",
+//     session: false
+//   }),
+//   (req, res) => {
+//     const token = jwt.sign(
+//       { userId: req.user._id, email: req.user.email },
+//       process.env.JWT_SECRET,
+//       { expiresIn: "1h" }
+//     );
+//     res.redirect(`http://localhost:3000/oauth-success?token=${token}&email=${req.user.email}`);
+//   }
+// );
+
+
 
 
 
@@ -179,30 +286,7 @@ router.get('/validate/videos', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch videos" });
   }
-  // const videoId = req.query.videoId;
-
-  // if (!videoId) return res.status(400).json({ valid: false });
-
-  // try {
-  //   const response = await axios.get(
-  //     `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet,status&key=${YOUTUBE_API_KEY}`
-  //   );
-
-  //   const video = response.data.items[0];
-
-  //   if (
-  //     video &&
-  //     video.status.privacyStatus === 'public' &&
-  //     !video.snippet.title.toLowerCase().includes("music") &&
-  //     !video.snippet.title.toLowerCase().includes("shorts")
-  //   ) {
-  //     res.json({ valid: true, title: video.snippet.title });
-  //   } else {
-  //     res.json({ valid: false });
-  //   }
-  // } catch (error) {
-  //   res.status(500).json({ valid: false });
-  // }
+  
 });
 
 function extractYouTubeVideoId(url) {
@@ -211,10 +295,6 @@ function extractYouTubeVideoId(url) {
   const match = url.match(regex);
   return match ? match[1] : null;
 }
-// module.exports = router;
-
-
-
 
 // Create Checkout Session Route
 router.post("/api/billing/create-checkout-session", async (req, res) => {
@@ -273,7 +353,7 @@ router.post("/api/billing/complete-checkout", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    console.log("User plan updated:", user);
+    // console.log("User plan updated:", user);
     res.status(200).json({ success: true });
   } catch (err) {
     console.error("❌ Error completing checkout:", err);
@@ -297,10 +377,6 @@ router.post("/get-user-by-email", async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 });
-
-
-// const jwt = require("jsonwebtoken");
-// const User = require("../models/User"); // Adjust path as needed
 
 router.get("/user", async (req, res) => {
   const authHeader = req.headers.authorization;
@@ -379,7 +455,7 @@ router.post("/signup", async (req, res) => {
     }
 
     const OTP = Math.floor(1000 + Math.random() * 9000).toString();
-    console.log("Generated OTP:", OTP);
+    // console.log("Generated OTP:", OTP);
 
     const otpExpiry = new Date(Date.now() + 5 * 60000); // 5 minutes
 
@@ -422,7 +498,7 @@ router.post("/signup", async (req, res) => {
         return res.status(500).json({ message: "Failed to send OTP email. Please try again later." });
       }
 
-      console.log("OTP Email sent:", info.response);
+      // console.log("OTP Email sent:", info.response);
       return res.status(201).json({
         message: "Signup successful. An OTP has been sent to your email.",
         token: "dummy-token", // If needed. Otherwise, remove.
@@ -523,7 +599,7 @@ router.post("/resend-otp", async (req, res) => {
         return res.status(500).json({ message: "Failed to send OTP email. Please try again later." });
       }
 
-      console.log("OTP Email sent:", info.response);
+      // console.log("OTP Email sent:", info.response);
       return res.status(201).json({
         message: "Signup successful. An OTP has been sent to your email.",
         token: "dummy-token", // If needed. Otherwise, remove.
@@ -532,7 +608,7 @@ router.post("/resend-otp", async (req, res) => {
 
 
     // Send OTP (e.g., via email service)
-    console.log(`Resent OTP to ${email}: ${newOtp}`);
+    // console.log(`Resent OTP to ${email}: ${newOtp}`);
 
     return res.json({ message: "OTP has been resent to your email." });
   } catch (error) {
@@ -546,9 +622,7 @@ router.post("/resend-otp", async (req, res) => {
 
 
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-
-  console.log("Login Attempt:", { email });
+  const { email, password, recaptchaToken } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({
@@ -556,7 +630,26 @@ router.post("/login", async (req, res) => {
     });
   }
 
+  // ✅ Check reCAPTCHA token
+  if (!recaptchaToken) {
+    return res.status(400).json({
+      message: "reCAPTCHA token is missing. Please complete the CAPTCHA.",
+    });
+  }
+
   try {
+    // ✅ Verify reCAPTCHA with Google
+    const secretKey = '6LfOHF8rAAAAAG1f1L1xtGIFY4iRt1chwLAMODPY';
+    const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${recaptchaToken}`;
+
+    const captchaResponse = await axios.post(verifyUrl);
+    if (!captchaResponse.data.success) {
+      return res.status(400).json({
+        message: "CAPTCHA verification failed. Please try again.",
+      });
+    }
+
+    // ✅ Proceed with login after CAPTCHA verification
     const user = await User.findOne({ email });
 
     if (!user) {
@@ -565,9 +658,7 @@ router.post("/login", async (req, res) => {
       });
     }
 
-
     const isMatch = await bcrypt.compare(password, user.password);
-
     if (!isMatch) {
       return res.status(401).json({
         message: "Incorrect password. Please try again.",
@@ -583,7 +674,7 @@ router.post("/login", async (req, res) => {
       message: "Login successful. Welcome back!",
       user: {
         email: user.email,
-        plan: user.plan || "Free", // Send plan back
+        plan: user.plan || "Free",
       },
     });
   } catch (error) {
@@ -594,73 +685,55 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// router.post("/login", async (req, res) => {
+//   const { email, password } = req.body;
 
+//   // console.log("Login Attempt:", { email });
 
-// router.post("/forgot-password", async (req, res) => {
-//   const { email } = req.body;
-
-//   if (!email) {
-//     return res.status(400).json({ message: "Email is required." });
+//   if (!email || !password) {
+//     return res.status(400).json({
+//       message: "Both email and password are required to login.",
+//     });
 //   }
 
 //   try {
 //     const user = await User.findOne({ email });
 
 //     if (!user) {
-//       return res.status(404).json({ message: "No account found with this email." });
+//       return res.status(404).json({
+//         message: "No account found with this email. Please sign up first.",
+//       });
 //     }
 
-//     // 🔐 Generate token
-//     const token = crypto.randomBytes(32).toString("hex");
 
-//     user.resetToken = token;
-//     user.resetTokenExpires = Date.now() + 3600000; // Token valid for 1 hour
+//     const isMatch = await bcrypt.compare(password, user.password);
 
-//     await user.save();
+//     if (!isMatch) {
+//       return res.status(401).json({
+//         message: "Incorrect password. Please try again.",
+//       });
+//     }
 
-//     // 📩 Create reset link
-    
-//     // const resetLink = `http://localhost:3000/reset-password/${token}`;
-//     const resetLink = `http://146.148.96.159/reset-password/${token}`;
-
-//     // ✉️ Send Email
-//     const mailOptions = {
-//       from: process.env.EMAIL_USER,
-//       to: user.email,
-//       subject: "Reset Your Password",
-//       html: `
-//       <html>
-//         <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
-//           <div style="max-width: 600px; margin: auto; background: #ffffff; padding: 20px; border-radius: 8px;">
-//             <h2 style="color: #333;">Hello ${user.name},</h2>
-//             <p style="color: #555;">We received a request to reset the password for your account. Please click the button below to reset your password:</p>
-//             <a href="http://146.148.96.159/reset-password/${token}" style="background-color: #4CAF50; color: white; padding: 14px 20px; text-align: center; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Reset Your Password</a>
-//             <p style="color: #555;">This link will expire in 1 hour. If you did not request a password reset, please ignore this email.</p>
-//             <p style="color: #555;">Thank you,<br/>The AI Chat Team</p>
-//           </div>
-//         </body>
-//       </html>`
-//     };
-//     // text: `Hello ${user.name},\n\nClick the link below to reset your password:\n\n${resetLink}\n\nThis link will expire in 1 hour.`,
-
-//     transporter.sendMail(mailOptions, (err, info) => {
-//       if (err) {
-//         console.error("Error sending reset email:", err);
-//         return res.status(500).json({ message: "Failed to send reset email." });
-//       }
-
-//       console.log("Reset email sent:", info.response);
-//       return res.status(200).json({ message: "Reset link sent to your email. just wait for few minutes." });
+//     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+//       expiresIn: "1h",
 //     });
 
-//   } catch (err) {
-//     console.error("Forgot password error:", err);
-//     return res.status(500).json({ message: "Server error. Please try again later." });
+//     return res.status(200).json({
+//       token,
+//       message: "Login successful. Welcome back!",
+//       user: {
+//         email: user.email,
+//         plan: user.plan || "Free", // Send plan back
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Login Error:", error);
+//     return res.status(500).json({
+//       message: "Something went wrong. Please try again later.",
+//     });
 //   }
 // });
 
-
-// const crypto = require("crypto");
 
 router.post("/forgot-password", async (req, res) => {
   const { email } = req.body;
@@ -705,7 +778,7 @@ router.post("/forgot-password", async (req, res) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log("Reset email sent:", info.response);
+    // console.log("Reset email sent:", info.response);
     return res.status(200).json({ message: "Reset link sent to your email. just wait for few minutes(It may take 5-10 minutes)." });
 
   } catch (err) {

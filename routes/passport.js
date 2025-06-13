@@ -4,15 +4,6 @@ const LinkedInStrategy = require("passport-linkedin-oauth2").Strategy;
 const FacebookStrategy = require('passport-facebook').Strategy;
 const User = require("../models/user"); // adjust the path to your model
 
-// passport.serializeUser((user, done) => {
-//   done(null, user.id);
-// });
-
-// passport.deserializeUser(async (id, done) => {
-//   const user = await User.findById(id);
-//   done(null, user);
-// });
-
 const generateUniqueRandomMobile = async () => {
   let mobile;
   let exists = true;
@@ -109,22 +100,26 @@ passport.use(
 passport.use(
   new LinkedInStrategy(
     {
-      clientID: "your-linkedin-client-id-here",
-      clientSecret: "your-linkedin-client-secret-here",
-      callbackURL: "/api/auth/linkedin/callback",
-      scope: ["r_emailaddress", "r_liteprofile"],
+      clientID: "78dxmfhlj5uitq",
+      clientSecret: "WPL_AP1.woi2Xah0UOBfTR7R.iyrSeQ==",
+      callbackURL: "https://www.immigrategpt.ca/api/auth/linkedin/callback",
+      // scope: ["r_emailaddress", "r_liteprofile"],
+      scope: ['r_emailaddress', 'r_liteprofile'],
+      state: true
     },
     async (accessToken, tokenSecret, profile, done) => {
       const email = profile.emails[0].value;
       let user = await User.findOne({ email });
 
       if (!user) {
+          const uniqueMobile = await generateUniqueRandomMobile();
         user = await User.create({
           email,
           name: profile.displayName,
           provider: "linkedin",
           password: null,
           plan: "Free",
+          mobile: uniqueMobile,
         });
       }
 
@@ -132,3 +127,41 @@ passport.use(
     }
   )
 );
+
+
+const { OIDCStrategy } = require('passport-azure-ad');
+
+
+passport.use(new OIDCStrategy({
+  identityMetadata: 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
+  clientID: "abc",
+  clientSecret: "abc",
+  responseType: 'code',
+  responseMode: 'query',
+  redirectUrl: 'http://localhost:5000/api/auth/microsoft/callback',
+  allowHttpForRedirectUrl: true,
+  scope: ['openid', 'profile', 'email'],
+  passReqToCallback: false,
+}, async (issuer, sub, profile, accessToken, refreshToken, params, done) => {
+  try {
+    const email = profile._json.preferred_username;
+    const name = profile.displayName || 'Microsoft User';
+
+    // Implement your user retrieval/creation logic here
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = await User.create({
+        email,
+        name,
+        provider: 'microsoft',
+        password: null,
+        plan: 'Free',
+        // Add other necessary fields
+      });
+    }
+
+    return done(null, user);
+  } catch (err) {
+    return done(err);
+  }
+}));
