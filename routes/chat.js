@@ -5,7 +5,7 @@ const axios = require("axios");
 // const app = express();
 
 
-const OpenAI = require("openai");
+// const OpenAI = require("openai");
 
 const pdfParse = require("pdf-parse");
 const path = require("path");
