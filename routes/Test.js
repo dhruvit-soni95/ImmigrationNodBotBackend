@@ -6,9 +6,11 @@ const fs = require("fs");
 const pdfParse = require("pdf-parse");
 const axios = require("axios");
 const router = express.Router();
-
+// const cheerio = require("cheerio");
+const TOGETHER_AI_API_KEY =
+  "ccd534e23377572759c4e3e037acd8af56412ae39cca3c80b75d61a5d846092f";
 const cheerio = require("cheerio");
-global.ReadableStream = require("web-streams-polyfill/ponyfill").ReadableStream;
+// global.ReadableStream = require("web-streams-polyfill/ponyfill").ReadableStream;
 
 // const TestTopic = require("./models/TestTopic"); // make sure model path is correct
 
@@ -17,51 +19,78 @@ mongoose.connect(process.env.MONGO_URI, {
   useUnifiedTopology: true,
 });
 
-// 🔥 Main route
+// Normalize for deduplication
+const normalizeUrl = (url) => {
+  try {
+    const u = new URL(url);
+    return `${u.hostname}${u.pathname.replace(/\/$/, "")}`;
+  } catch {
+    return url;
+  }
+};
+
+// Google search: top 1 deduplicated link
+const fetchFromGoogle = async (queryText, API_KEY, CX) => {
+  const query = encodeURIComponent(queryText);
+  const res = await fetch(
+    `https://www.googleapis.com/customsearch/v1?q=${query}&key=${API_KEY}&cx=${CX}`
+  );
+  const data = await res.json();
+  if (!data.items) return [];
+
+  const seen = new Set();
+  const filtered = data.items
+    .map((item) => ({ title: item.title, url: item.link }))
+    .filter((item) => {
+      const normalized = normalizeUrl(item.url);
+      if (seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    });
+
+  return filtered.slice(0, 1);
+};
+
+// Extract body text from page
+const scrapeWebpageText = async (url) => {
+  const page = await axios.get(url);
+  const $ = cheerio.load(page.data);
+  $("script, style, noscript").remove();
+  return $("body").text().replace(/\s+/g, " ").trim().slice(0, 4000);
+};
+
+// ✅ Main route
 router.post("/api/generate-questions", async (req, res) => {
   try {
     const { topic, sourceType, url } = req.body;
+    const API_KEY = "abc";
+    const CX = "abc";
+    // const API_KEY = process.env.GOOGLE_API_KEY;
+    // const CX = process.env.GOOGLE_CX;
 
-    if (!topic) return res.status(400).json({ error: "Topic is required" });
+    // Validate topic
+    const allowedTopics = ["immigration", "canada study permit", "work"];
+    if (!allowedTopics.includes(topic)) {
+      return res.status(400).json({ error: "Invalid topic provided" });
+    }
 
     let text = "";
 
-    // 📄 PDF Source
-    if (sourceType === "pdf") {
-      const pdfPath = path.join(__dirname, "..", "pdfs", `${topic}.pdf`);
-      if (!fs.existsSync(pdfPath)) {
-        return res
-          .status(404)
-          .json({ error: "PDF file not found for this topic" });
-      }
-      const dataBuffer = fs.readFileSync(pdfPath);
-      const parsed = await pdfParse(dataBuffer);
-      text = parsed.text.slice(0, 4000); // LLM token limit safety
+    if (sourceType === "url") {
+      if (!url) return res.status(400).json({ error: "URL is required" });
+      text = await scrapeWebpageText(url);
+    } else if (sourceType === "google") {
+      const results = await fetchFromGoogle(topic, API_KEY, CX);
+      if (!results.length)
+        return res.status(404).json({ error: "No search results found" });
+
+      text = await scrapeWebpageText(results[0].url);
+    } else {
+      return res.status(400).json({
+        error: "Invalid sourceType (must be 'url' or 'google')",
+      });
     }
 
-    // 🌐 Webpage Source
-    else if (sourceType === "url") {
-      if (!url)
-        return res
-          .status(400)
-          .json({ error: "URL is required for web source" });
-
-      const page = await axios.get(url);
-      const $ = cheerio.load(page.data);
-
-      // Strip out scripts/styles, get only text
-      $("script, style, noscript").remove();
-      text = $("body").text().replace(/\s+/g, " ").trim().slice(0, 4000);
-    }
-
-    // ❌ No source found
-    else {
-      return res
-        .status(400)
-        .json({ error: "Invalid sourceType (must be 'pdf' or 'url')" });
-    }
-
-    // 🧠 Prompt for LLM
     const prompt = `
 You are an exam creator. Based on the following text, generate 10 multiple-choice questions.
 
@@ -81,7 +110,6 @@ TEXT:
 """${text}"""
 `;
 
-    // 🔗 Call Together AI
     const apiRes = await axios.post(
       "https://api.together.xyz/v1/chat/completions",
       {
@@ -94,7 +122,7 @@ TEXT:
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.TOGETHER_AI_API_KEY}`,
+          Authorization: `Bearer ${TOGETHER_AI_API_KEY}`,
           "Content-Type": "application/json",
         },
       }
@@ -110,19 +138,16 @@ TEXT:
     const parsedQuestions = JSON.parse(match[0]);
 
     const questions = parsedQuestions.map((q, i) => {
-      if (!q.answer && q.correct_answer) {
-        q.answer = q.correct_answer;
-      }
+      if (!q.answer && q.correct_answer) q.answer = q.correct_answer;
 
       if (
         !q.question ||
         !q.options ||
         !q.answer ||
+        !Array.isArray(q.options) ||
         !q.options.includes(q.answer)
       ) {
-        throw new Error(
-          `Invalid or missing answer/options in question ${i + 1}`
-        );
+        throw new Error(`Invalid question format at index ${i + 1}`);
       }
 
       return {
@@ -144,6 +169,135 @@ TEXT:
     res.status(500).json({ error: err.message });
   }
 });
+
+// // 🔥 Main route
+// router.post("/api/generate-questions", async (req, res) => {
+//   try {
+//     const { topic, sourceType, url } = req.body;
+
+//     if (!topic) return res.status(400).json({ error: "Topic is required" });
+
+//     let text = "";
+
+//     // 📄 PDF Source
+//     if (sourceType === "pdf") {
+//       const pdfPath = path.join(__dirname, "..", "pdfs", `${topic}.pdf`);
+//       if (!fs.existsSync(pdfPath)) {
+//         return res
+//           .status(404)
+//           .json({ error: "PDF file not found for this topic" });
+//       }
+//       const dataBuffer = fs.readFileSync(pdfPath);
+//       const parsed = await pdfParse(dataBuffer);
+//       text = parsed.text.slice(0, 4000); // LLM token limit safety
+//     }
+
+//     // 🌐 Webpage Source
+//     else if (sourceType === "url") {
+//       if (!url)
+//         return res
+//           .status(400)
+//           .json({ error: "URL is required for web source" });
+
+//       const page = await axios.get(url);
+//       const $ = cheerio.load(page.data);
+
+//       // Strip out scripts/styles, get only text
+//       $("script, style, noscript").remove();
+//       text = $("body").text().replace(/\s+/g, " ").trim().slice(0, 4000);
+//     }
+
+//     // ❌ No source found
+//     else {
+//       return res
+//         .status(400)
+//         .json({ error: "Invalid sourceType (must be 'pdf' or 'url')" });
+//     }
+
+//     // 🧠 Prompt for LLM
+//     const prompt = `
+// You are an exam creator. Based on the following text, generate 10 multiple-choice questions.
+
+// Format:
+// Each question should be a JSON object like this:
+// {
+//   "question": "Your question here?",
+//   "options": ["Option A", "Option B", "Option C", "Option D"],
+//   "answer": "One of the options exactly"
+// }
+
+// Requirements:
+// - "answer" must match EXACTLY one of the options.
+// - Only return the JSON array (no explanation).
+
+// TEXT:
+// """${text}"""
+// `;
+
+//     // 🔗 Call Together AI
+//     const apiRes = await axios.post(
+//       "https://api.together.xyz/v1/chat/completions",
+//       {
+//         model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+//         temperature: 0.3,
+//         messages: [
+//           { role: "system", content: "You generate test questions" },
+//           { role: "user", content: prompt },
+//         ],
+//       },
+//       {
+//         headers: {
+//           Authorization: `Bearer ${process.env.TOGETHER_AI_API_KEY}`,
+//           "Content-Type": "application/json",
+//         },
+//       }
+//     );
+
+//     const content = apiRes.data.choices?.[0]?.message?.content;
+//     const match = content.match(/\[\s*{[\s\S]*}\s*\]/);
+//     if (!match)
+//       throw new Error(
+//         "Failed to extract valid JSON array from model response."
+//       );
+
+//     const parsedQuestions = JSON.parse(match[0]);
+
+//     const questions = parsedQuestions.map((q, i) => {
+//       if (!q.answer && q.correct_answer) {
+//         q.answer = q.correct_answer;
+//       }
+
+//       if (
+//         !q.question ||
+//         !q.options ||
+//         !q.answer ||
+//         !q.options.includes(q.answer)
+//       ) {
+//         throw new Error(
+//           `Invalid or missing answer/options in question ${i + 1}`
+//         );
+//       }
+
+//       return {
+//         question: q.question.trim(),
+//         options: q.options.map((opt) => opt.trim()),
+//         answer: q.answer.trim(),
+//       };
+//     });
+
+//     const doc = await TestTopic.findOneAndUpdate(
+//       { topic },
+//       { $push: { questions: { $each: questions } } },
+//       { upsert: true, new: true }
+//     );
+
+//     res.json({ success: true, savedCount: questions.length, doc });
+//   } catch (err) {
+//     console.error("🚨 Error:", err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
 // router.get("/api/add-testdata", async (req, res) => {
 // router.post("/api/generate-questions", async (req, res) => {
 //   console.log("aaaaaaaaaaaaa");

@@ -4,7 +4,6 @@ const axios = require("axios");
 // const mongoose = require("mongoose");
 // const app = express();
 
-
 // const OpenAI = require("openai");
 
 const pdfParse = require("pdf-parse");
@@ -19,37 +18,148 @@ require("dotenv").config();
 const Chat = require("../models/Chat"); // ⬅️ MongoDB model
 const User = require("../models/user");
 
+const { searchPDFCache } = require("../utils/pdfCache");
+const { getTavilyWebContext } = require("../utils/tavily");
+const { getCacheEntries } = require("../utils/tavily");
+
 const Stripe = require("stripe");
 // const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
-const GOOGLE_API_KEY = "AIzaSyC5pzHja6UZWDJjP6bZqB-WLWw4CYKeUQE";
-const GOOGLE_CX = "9355b1c87eeb24b0b";
+const GOOGLE_API_KEY = "abc";
+const GOOGLE_CX = "abc";
 const TOGETHER_AI_API_KEY =
   "ccd534e23377572759c4e3e037acd8af56412ae39cca3c80b75d61a5d846092f";
 
-
+const fsPromises = require("fs/promises");
 // Store conversation history per chatId
 const chatHistory = {};
 
-
 TAVILY_API_KEY = "abc";
 
-
 // 🧠 Get Tavily web search results
-async function getTavilyWebContext(query) {
-  const res = await axios.post("https://api.tavily.com/search", {
-    api_key: TAVILY_API_KEY,
-    query,
-    search_depth: "advanced", // or "basic"
-    max_results: 5,
-  });
+// async function getTavilyWebContext(query) {
+//   const res = await axios.post("https://api.tavily.com/search", {
+//     api_key: TAVILY_API_KEY,
+//     query,
+//     search_depth: "advanced", // or "basic"
+//     max_results: 5,
+//   });
 
-  return (
-    res.data?.results
-      ?.map((r) => `- ${r.title}: ${r.url}\n${r.content}`)
-      .join("\n\n") || ""
-  );
+//   return (
+//     res.data?.results
+//       ?.map((r) => `- ${r.title}: ${r.url}\n${r.content}`)
+//       .join("\n\n") || ""
+//   );
+// }
+// function logTavilyCache() {
+//   console.log("🧠 Tavily Cache Contents:");
+//   for (const [key, value] of tavilyCache.entries()) {
+//     console.log(`• ${key} → ${value.length} characters`);
+//   }
+// }
+
+// router.get("/debug/tavily-cache", (req, res) => {
+//   res.json([...tavilyCache.entries()].map(([k, v]) => ({ query: k, length: v.length })));
+// });
+
+function printTavilyCacheToConsole() {
+  console.log("🧠 Tavily In-Memory Cache:");
+  for (const [key, value] of tavilyCache.entries()) {
+    console.log(`• ${key}`);
+    console.log(value.slice(0, 500)); // print first 500 chars for brevity
+    console.log("-----------\n");
+  }
 }
+
+// router.get("/debug/tavily", (req, res) => {
+//   const cacheDump = [...tavilyCache.entries()].map(([query, content]) => ({
+//     query,
+//     preview: content.slice(0, 500), // or full content if needed
+//     length: content.length,
+//   }));
+
+//   res.json({ total: cacheDump.length, cache: cacheDump });
+// });
+
+router.get("/debug/tavily", async (req, res) => {
+  const entries = await getCacheEntries();
+  res.json({ total: entries.length, cache: entries });
+});
+
+// router.get("/debug/tavily", (req, res) => {
+//   const cacheDump = getCacheEntries().map(([query, content]) => ({
+//     query,
+//     preview: content.slice(0, 500),
+//     length: content.length,
+//   }));
+
+//   res.json({ total: cacheDump.length, cache: cacheDump });
+// });
+
+// const CACHE_FILE = path.join(__dirname, "tavilyCache.json");
+// const tavilyCache = new Map(); // key: normalized query, value: result string
+
+// function loadCacheFromFile() {
+//   if (fs.existsSync(CACHE_FILE)) {
+//     try {
+//       const raw = fs.readFileSync(CACHE_FILE, "utf-8");
+//       const data = JSON.parse(raw);
+//       for (const [key, value] of Object.entries(data)) {
+//         tavilyCache.set(key, value);
+//       }
+//       console.log(`✅ Loaded Tavily cache from disk (${tavilyCache.size} items)`);
+//     } catch (err) {
+//       console.error("❌ Failed to load Tavily cache:", err.message);
+//     }
+//   }
+// }
+
+// function saveCacheToFile() {
+//   try {
+//     const obj = Object.fromEntries(tavilyCache);
+//     fs.writeFileSync(CACHE_FILE, JSON.stringify(obj, null, 2), "utf-8");
+//     console.log("💾 Tavily cache saved to disk.");
+//   } catch (err) {
+//     console.error("❌ Failed to save Tavily cache:", err.message);
+//   }
+// }
+
+// function normalizeQuery(query) {
+//   return query.trim().toLowerCase(); // simple normalization
+// }
+
+// async function getTavilyWebContext(query) {
+//   const key = normalizeQuery(query);
+
+//   if (tavilyCache.has(key)) {
+//     console.log("⚡ Serving Tavily result from cache for:", key);
+//     return tavilyCache.get(key);
+//   }
+
+//   try {
+//     const res = await axios.post("https://api.tavily.com/search", {
+//       api_key: TAVILY_API_KEY,
+//       query,
+//       search_depth: "advanced",
+//       max_results: 5,
+//     });
+
+//     const formatted = (
+//       res.data?.results
+//         ?.map((r) => `- ${r.title}: ${r.url}\n${r.content}`)
+//         .join("\n\n") || ""
+//     );
+
+//     tavilyCache.set(key, formatted);  // ✅ Save to in-memory cache
+//     saveCacheToFile();                // ✅ Persist to file
+//     console.log("✅ Cached new Tavily result for:", key);
+
+//     return formatted;
+//   } catch (err) {
+//     console.error("❌ Tavily fetch failed:", err.message);
+//     return null;
+//   }
+// }
 
 async function isRelatedToImmigration(userMessage) {
   try {
@@ -69,7 +179,6 @@ async function isRelatedToImmigration(userMessage) {
         },
       }
     );
-
 
     const classification = response.data.choices[0]?.message?.content
       .trim()
@@ -123,51 +232,226 @@ async function fetchGoogleSearchSnippets(query) {
   }
 }
 
-async function fetchRelevantPdfContent(query) {
-  // console.log("🔍 PDF Search initiated with query:", query);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// const getRelatedLinks = async (mainUrl, API_KEY, CX) => {
+
+//   try {
+//     // 1. Try from Google API
+//     const related = await fetchFromGoogle(mainUrl, API_KEY, CX);
+
+//     if (related.length) {
+//       // Save to MongoDB
+//       await LinkCache.create({
+//         query: mainUrl,
+//         mainUrl,
+//         related,
+//         source: "google",
+//       });
+
+//       return related;
+//     }
+//   } catch (err) {
+//     console.warn("Google API failed:", err.message);
+//   }
+
+//   // 2. Fallback to MongoDB if Google fails
+//   const cached = await LinkCache.findOne({ mainUrl }).sort({ createdAt: -1 });
+
+//   if (cached) {
+//     return cached.related.map((r) => ({ ...r, source: "cache" }));
+//   }
+
+//   return [];
+// };
+
+const LinkCache = require("../models/LinkCache");
+const fetch = require("node-fetch");
+const normalizeUrl = (url) => {
   try {
-    const pdfDir = path.join(__dirname, "../pdfs");
-    // console.log("📁 PDF directory path:", pdfDir);
-
-    if (!fs.existsSync(pdfDir)) {
-      // console.log("❌ PDF folder not found");
-      return null;
-    }
-
-    const files = fs.readdirSync(pdfDir).filter((f) => f.endsWith(".pdf"));
-    // console.log("📄 PDF files found:", files);
-
-    let combinedResults = "";
-    console.log("🔍 Searching PDFs for:", query);
-    console.log("📄 PDFs Found:", files);
-
-    for (const file of files) {
-      const filePath = path.join(pdfDir, file);
-      const dataBuffer = fs.readFileSync(filePath);
-      const pdfData = await pdfParse(dataBuffer);
-      const text = pdfData.text.replace(/\s+/g, " ").trim();
-
-      // console.log(`📃 Searching in ${file}...`);
-
-      if (text.toLowerCase().includes(query.toLowerCase())) {
-        console.log(`✅ Found relevant content in: ${file}`);
-        combinedResults += `From: ${file}\n${text.slice(0, 1500)}\n\n`;
-      }
-    }
-
-    if (combinedResults) {
-      // console.log("✅ Combined PDF context prepared:");
-      // console.log(combinedResults);
-    } else {
-      // console.log("❌ No relevant content found in any PDF.");
-    }
-
-    return combinedResults || null;
-  } catch (err) {
-    console.error("❌ PDF RAG fetch failed:", err.message);
-    return null;
+    const u = new URL(url);
+    return `${u.hostname}${u.pathname.replace(/\/$/, "")}`;
+  } catch {
+    return url;
   }
+};
+
+const fetchFromGoogle = async (mainUrl, API_KEY, CX) => {
+  const query = encodeURIComponent(mainUrl);
+  const res = await fetch(
+    `https://www.googleapis.com/customsearch/v1?q=${query}&key=${API_KEY}&cx=${CX}`
+  );
+  const data = await res.json();
+  if (!data.items) return [];
+  const seen = new Set();
+  return data.items
+    .map((item) => ({
+      title: item.title,
+      url: item.link,
+    }))
+    .filter((item) => {
+      // const normalized = item.url.replace(/\/$/, "");
+      const normalized = normalizeUrl(item.url); // ✅ updated here
+      if (seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    })
+    .slice(0, 3);
+};
+
+const getRelatedLinks = async (mainUrl, API_KEY, CX) => {
+  try {
+    // 🔍 Step 1: Check cache first
+    const cached = await LinkCache.findOne({ mainUrl }).sort({ createdAt: -1 });
+    // if (cached && cached.related?.length > 0) {
+    //   return cached.related.map((r) => ({ ...r, source: "cache" }));
+    // }
+    if (cached && cached.related?.length > 0) {
+  return cached.related.map(({ title, url }) => ({
+    title,
+    url,
+    source: "cache",
+  }));
 }
+
+    // 🌐 Step 2: Try from Google API
+    const related = await fetchFromGoogle(mainUrl, API_KEY, CX);
+    if (related.length > 0) {
+      // 💾 Save only if not already saved
+      await LinkCache.create({
+        query: mainUrl,
+        mainUrl,
+        related,
+        source: "google",
+      });
+      return related;
+    }
+  } catch (err) {
+    console.warn("Google API failed:", err.message);
+  }
+  // ⚠️ Step 3: Fallback - even if cached is empty or Google failed
+  const fallback = await LinkCache.findOne({ mainUrl }).sort({ createdAt: -1 });
+  // if (fallback) {
+  //   return fallback.related.map((r) => ({ ...r, source: "cache" }));
+  // }
+  if (fallback && fallback.related?.length > 0) {
+  return fallback.related.map(({ title, url }) => ({
+    title,
+    url,
+    source: "cache",
+  }));
+}
+
+  return [];
+};
+
+router.get("/related-links", async (req, res) => {
+  const { url } = req.query;
+  const API_KEY = "abc";
+  const CX = "abc";
+  if (!url) return res.status(400).json({ error: "Missing URL" });
+  try {
+    const links = await getRelatedLinks(url, API_KEY, CX);
+    return res.json({ links });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch related links" });
+  }
+});
+
+
+// what i thnk that main url sometime not same right? may differs 
+
+
+
+// async function fetchRelevantPdfContent(query) {
+//   try {
+//     const pdfDir = path.join(__dirname, "../pdfs");
+//     if (!fs.existsSync(pdfDir)) return null;
+
+//     const files = (await fsPromises.readdir(pdfDir)).filter(f => f.endsWith(".pdf"));
+//     const results = await Promise.all(
+//       files.map(async (file) => {
+//         const filePath = path.join(pdfDir, file);
+//         const dataBuffer = await fsPromises.readFile(filePath);
+//         const pdfData = await pdfParse(dataBuffer);
+//         const text = pdfData.text.replace(/\s+/g, " ").trim();
+
+//         if (text.toLowerCase().includes(query.toLowerCase())) {
+//           return `From: ${file}\n${text.slice(0, 1500)}\n\n`;
+//         }
+//         return null;
+//       })
+//     );
+
+//     return results.filter(Boolean).join("") || null;
+//   } catch (err) {
+//     console.error("❌ PDF RAG fetch failed:", err.message);
+//     return null;
+//   }
+// }
+
+// async function fetchRelevantPdfContent(query) {
+//   // console.log("🔍 PDF Search initiated with query:", query);
+//   try {
+//     const pdfDir = path.join(__dirname, "../pdfs");
+//     // console.log("📁 PDF directory path:", pdfDir);
+
+//     if (!fs.existsSync(pdfDir)) {
+//       // console.log("❌ PDF folder not found");
+//       return null;
+//     }
+
+//     const files = fs.readdirSync(pdfDir).filter((f) => f.endsWith(".pdf"));
+//     // console.log("📄 PDF files found:", files);
+
+//     let combinedResults = "";
+//     console.log("🔍 Searching PDFs for:", query);
+//     console.log("📄 PDFs Found:", files);
+
+//     for (const file of files) {
+//       const filePath = path.join(pdfDir, file);
+//       const dataBuffer = fs.readFileSync(filePath);
+//       const pdfData = await pdfParse(dataBuffer);
+//       const text = pdfData.text.replace(/\s+/g, " ").trim();
+
+//       // console.log(`📃 Searching in ${file}...`);
+
+//       if (text.toLowerCase().includes(query.toLowerCase())) {
+//         console.log(`✅ Found relevant content in: ${file}`);
+//         combinedResults += `From: ${file}\n${text.slice(0, 1500)}\n\n`;
+//       }
+//     }
+
+//     if (combinedResults) {
+//       // console.log("✅ Combined PDF context prepared:");
+//       // console.log(combinedResults);
+//     } else {
+//       // console.log("❌ No relevant content found in any PDF.");
+//     }
+
+//     return combinedResults || null;
+//   } catch (err) {
+//     console.error("❌ PDF RAG fetch failed:", err.message);
+//     return null;
+//   }
+// }
 
 function formatAIResponse(text) {
   const lines = text.split("\n");
@@ -205,107 +489,233 @@ function formatAIResponse(text) {
 }
 
 // 🧠 /chat Route
+
+router.get("/debug/pdf-cache", (req, res) => {
+  const query = req.query.q || "";
+  const result = searchPDFCache(query);
+  res.json({
+    query,
+    found: !!result,
+    content: result?.slice(0, 500) || "No matching PDF content",
+  });
+});
+
+// router.post("/chat", async (req, res) => {
+//   try {
+//     const { message, chatId, userEmail } = req.body;
+
+//     if (!message || !chatId || !userEmail) {
+//       return res
+//         .status(400)
+//         .json({ error: "Missing message, chatId, or userEmail" });
+//     }
+
+//     // ✅ Build previous chat history from MongoDB
+//     const userChatDoc = await Chat.findOne({ userEmail });
+//     const existingChat = userChatDoc?.chats.find((c) => c.id === chatId);
+
+//     const messages = existingChat
+//       ? existingChat.messages.map((m) => ({
+//           role: m.sender === "user" ? "user" : "assistant",
+//           content: m.text,
+//         }))
+//       : [];
+
+//     // ✅ Append user's new message
+//     messages.push({ role: "user", content: message });
+
+//     // ✅ Fetch Tavily and PDF context in parallel
+//     // const [webContext, pdfContext] = await Promise.all([
+//     //   getTavilyWebContext(message),
+//     //   ''
+//     //   // searchPDFCache(message),
+//     // ]);
+//     const [webContext, pdfContext] = await Promise.all([
+//       getTavilyWebContext(message),
+//       fetchGoogleSearchSnippets(message),
+//     ]);
+
+//     // ✅ Construct system prompt
+//     const lowerMsg = message.toLowerCase().trim();
+//     const isSmallTalk =
+//       ["hi", "hello", "hey", "how are you", "good morning", "good night"].some(
+//         (greet) => lowerMsg.includes(greet)
+//       ) || lowerMsg.length < 8;
+
+//     let systemPrompt = isSmallTalk
+//       ? `You are ImmigrateGPT. Respond briefly and politely to greetings like "hello", "hi", or "how are you". Avoid long answers.`
+//       : `Your name is ImmigrateGPT Bot. You are an expert in Canadian immigration, work permits, study guides, and visa rules. Use ONLY reliable, current information from the year 2025. Answer strictly about Canadian immigration-related topics.
+
+// If the user requests, provide relevant web or YouTube links related to the topic, and give long, detailed responses when asked for follow-ups or related topics.
+
+// Do not disclose anything about yourself, your identity, how you were built, what technologies or models you use, or any implementation details. Politely decline to answer any non-immigration-related or personal questions.`;
+
+//     if (!isSmallTalk && (webContext || pdfContext)) {
+//       systemPrompt += `\n\n--- Injected 2025 Web Context ---\n${
+//         webContext || ""
+//       }\n\n--- Injected PDF Context ---\n${pdfContext || ""}`;
+//     }
+
+//     // ✅ Prepend system prompt
+//     messages.unshift({ role: "system", content: systemPrompt });
+
+//     // ✅ Call OpenAI API
+//     const payload = {
+//       model: "gpt-4.1",
+//       temperature: 0.3,
+//       messages,
+//     };
+
+//     const aiResponse = await axios.post(
+//       "https://api.openai.com/v1/chat/completions",
+//       payload,
+//       {
+//         headers: {
+//           Authorization: `Bearer abc`, // Always use env vars in real apps
+//           "Content-Type": "application/json",
+//         },
+//       }
+//     );
+
+//     let botMessage = aiResponse.data?.choices?.[0]?.message?.content?.trim();
+//     botMessage = formatAIResponse(botMessage); // optional formatting (steps, bullets, etc.)
+
+//     if (!botMessage) {
+//       return res.status(500).json({ error: "Invalid AI response" });
+//     }
+
+//     const newMessages = [
+//       { sender: "user", text: message },
+//       { sender: "bot", text: botMessage },
+//     ];
+
+//     const chatTitle =
+//       message.length > 25 ? message.slice(0, 25) + "..." : message;
+
+//     // ✅ Save to DB
+//     const existingChatDoc = await Chat.findOne(
+//       { userEmail, "chats.id": chatId },
+//       { "chats.$": 1 }
+//     );
+//     const existingChat1 = existingChatDoc?.chats?.[0];
+
+//     const updateQuery = {
+//       $push: { "chats.$.messages": { $each: newMessages } },
+//     };
+
+//     if (!existingChat1?.name) {
+//       updateQuery.$set = { "chats.$.name": chatTitle };
+//     }
+
+//     const updateResult = await Chat.updateOne(
+//       { userEmail, "chats.id": chatId },
+//       updateQuery
+//     );
+
+//     if (updateResult.matchedCount === 0) {
+//       await Chat.updateOne(
+//         { userEmail },
+//         {
+//           $push: {
+//             chats: {
+//               id: chatId,
+//               name: chatTitle,
+//               messages: newMessages,
+//               isTemp: false,
+//               createdAt: new Date(),
+//             },
+//           },
+//         },
+//         { upsert: true }
+//       );
+//     }
+
+//     res.json({ response: botMessage });
+//   } catch (error) {
+//     console.error("❌ Chat Error:", error.response?.data || error.message);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
+
 router.post("/chat", async (req, res) => {
   try {
     const { message, chatId, userEmail } = req.body;
+
     if (!message || !chatId || !userEmail) {
-      return res
-        .status(400)
-        .json({ error: "Missing message, chatId, or userEmail" });
+      return res.status(400).json({ error: "Missing message, chatId, or userEmail" });
     }
 
-    // Build chat history
+    // ✅ Get previous chat history
     const userChatDoc = await Chat.findOne({ userEmail });
     const existingChat = userChatDoc?.chats.find((c) => c.id === chatId);
-    const messages = existingChat
+
+    let messages = existingChat
       ? existingChat.messages.map((m) => ({
           role: m.sender === "user" ? "user" : "assistant",
           content: m.text,
         }))
       : [];
 
-    messages.push({ role: "user", content: message });
+    // ✅ Fetch Tavily and Google context in parallel
+    const [webContext, pdfContext] = await Promise.all([
+      getTavilyWebContext(message),
+      fetchGoogleSearchSnippets(message),
+    ]);
 
-    // 🔍 Tavily + PDF
-    // const webContext = await getInjectedWebContext(message);
-    const webContext = await getTavilyWebContext(message);
-    console.log("web conext: " + webContext);
-    const pdfContext = await fetchRelevantPdfContent(message);
-
-    let systemPrompt = "";
+    // ✅ Determine small talk
     const lowerMsg = message.toLowerCase().trim();
-    const isSmallTalk =
-      ["hi", "hello", "hey", "how are you", "good morning", "good night"].some(
-        (greet) => lowerMsg.includes(greet)
-      ) || lowerMsg.length < 8;
+    const isSmallTalk = ["hi", "hello", "hey", "how are you", "good morning", "good night"].some(
+      (greet) => lowerMsg.includes(greet)
+    ) || lowerMsg.length < 8;
 
-    if (isSmallTalk) {
-      systemPrompt = `You are ImmigrateGPT. Respond briefly and politely to greetings like "hello", "hi", or "how are you". Avoid long answers.`;
-    } else {
-      systemPrompt = `Your name is ImmigrateGPT Bot. You are an expert in Canadian immigration, work permits, study guides, and visa rules. Use ONLY reliable, current information from the year 2025. stirctly give latest this 2025 data. Answer strictly about Canadian immigration-related topics.
+    // ✅ Trim previous messages to the last 10
+    const trimmedMessages = messages.slice(-10);
 
-If the user requests, provide relevant web or YouTube links related to the topic, and give long, detailed responses when asked for follow-ups or related topics.
-
-Do not disclose anything about yourself, your identity, how you were built, what technologies or models you use, or any implementation details. Politely decline to answer any non-immigration-related or personal questions.`;
-
-      if (webContext || pdfContext) {
-        systemPrompt += `\n\n--- Injected 2025 Web Context ---\n${webContext}\n\n--- Injected PDF Context ---\n${pdfContext}`;
-      }
+    // ✅ Inject web + PDF context as assistant message (not in system)
+    if (!isSmallTalk && (webContext || pdfContext)) {
+      trimmedMessages.push({
+        role: "assistant",
+        content: `📘 Web Info:\n${webContext || "N/A"}\n\n📄 PDF Info:\n${pdfContext || "N/A"}`,
+      });
     }
 
-    messages.unshift({ role: "system", content: systemPrompt });
+    // ✅ Add user's current message
+    trimmedMessages.push({ role: "user", content: message });
 
-    // 🧠 Call Together AI or any LLM
-    // const payload = {
-    //   model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-    //   temperature: 0.3,
-    //   messages,
-    // };
+    // ✅ Add short system prompt (bot identity)
+    trimmedMessages.unshift({
+      role: "system",
+      content: "You are ImmigrateGPT, a helpful assistant that answers only Canadian immigration-related questions using up-to-date information. Respond professionally.",
+    });
 
-    // const aiResponse = await axios.post(
-    //   "https://api.together.xyz/v1/chat/completions",
-    //   payload,
-    //   {
-    //     headers: {
-    //       Authorization: `Bearer ${TOGETHER_AI_API_KEY}`,
-    //       "Content-Type": "application/json",
-    //     },
-    //   }
-    // );
+    // ✅ Send to OpenAI
     const payload = {
       model: "gpt-4.1",
       temperature: 0.3,
-      messages,
+      messages: trimmedMessages,
     };
 
-    const aiResponse = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      payload,
-      {
-        headers: {
-          Authorization: `Bearer abc`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    // const botMessage = aiResponse.data?.choices?.[0]?.message?.content?.trim();
+    const aiResponse = await axios.post("https://api.openai.com/v1/chat/completions", payload, {
+      headers: {
+        Authorization: `Bearer abc`,
+        "Content-Type": "application/json",
+      },
+    });
 
     let botMessage = aiResponse.data?.choices?.[0]?.message?.content?.trim();
-botMessage = formatAIResponse(botMessage);
-
+    botMessage = formatAIResponse(botMessage); // Optional: format as steps/bullets
 
     if (!botMessage) {
       return res.status(500).json({ error: "Invalid AI response" });
     }
 
+    // ✅ Save chat messages
     const newMessages = [
       { sender: "user", text: message },
       { sender: "bot", text: botMessage },
     ];
 
-    const chatTitle =
-      message.length > 25 ? message.slice(0, 25) + "..." : message;
+    const chatTitle = message.length > 25 ? message.slice(0, 25) + "..." : message;
 
     const existingChatDoc = await Chat.findOne(
       { userEmail, "chats.id": chatId },
@@ -321,10 +731,7 @@ botMessage = formatAIResponse(botMessage);
       updateQuery.$set = { "chats.$.name": chatTitle };
     }
 
-    const updateResult = await Chat.updateOne(
-      { userEmail, "chats.id": chatId },
-      updateQuery
-    );
+    const updateResult = await Chat.updateOne({ userEmail, "chats.id": chatId }, updateQuery);
 
     if (updateResult.matchedCount === 0) {
       await Chat.updateOne(
@@ -351,6 +758,186 @@ botMessage = formatAIResponse(botMessage);
   }
 });
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// router.post("/chat", async (req, res) => {
+//   try {
+//     const { message, chatId, userEmail } = req.body;
+//     if (!message || !chatId || !userEmail) {
+//       return res
+//         .status(400)
+//         .json({ error: "Missing message, chatId, or userEmail" });
+//     }
+
+//     // Build chat history
+//     const userChatDoc = await Chat.findOne({ userEmail });
+//     const existingChat = userChatDoc?.chats.find((c) => c.id === chatId);
+//     const messages = existingChat
+//       ? existingChat.messages.map((m) => ({
+//           role: m.sender === "user" ? "user" : "assistant",
+//           content: m.text,
+//         }))
+//       : [];
+
+//     messages.push({ role: "user", content: message });
+
+//     // 🔍 Tavily + PDF
+//     // const webContext = await getInjectedWebContext(message);
+//     // const webContext = await getTavilyWebContext(message);
+//     // const pdfContext = await fetchRelevantPdfContent(message);
+//     const [webContext, pdfContext] = await Promise.all([
+//       getTavilyWebContext(message),
+//       fetchRelevantPdfContent(message),
+//     ]);
+//     console.log("web conext: " + webContext);
+
+//     let systemPrompt = "";
+//     const lowerMsg = message.toLowerCase().trim();
+//     const isSmallTalk =
+//       ["hi", "hello", "hey", "how are you", "good morning", "good night"].some(
+//         (greet) => lowerMsg.includes(greet)
+//       ) || lowerMsg.length < 8;
+
+//     if (isSmallTalk) {
+//       systemPrompt = `You are ImmigrateGPT. Respond briefly and politely to greetings like "hello", "hi", or "how are you". Avoid long answers.`;
+//     } else {
+//       systemPrompt = `Your name is ImmigrateGPT Bot. You are an expert in Canadian immigration, work permits, study guides, and visa rules. Use ONLY reliable, current information from the year 2025. stirctly give latest this 2025 data. Answer strictly about Canadian immigration-related topics.
+
+// If the user requests, provide relevant web or YouTube links related to the topic, and give long, detailed responses when asked for follow-ups or related topics.
+
+// Do not disclose anything about yourself, your identity, how you were built, what technologies or models you use, or any implementation details. Politely decline to answer any non-immigration-related or personal questions.`;
+
+//       if (webContext || pdfContext) {
+//         systemPrompt += `\n\n--- Injected 2025 Web Context ---\n${webContext}\n\n--- Injected PDF Context ---\n${pdfContext}`;
+//       }
+//     }
+
+//     messages.unshift({ role: "system", content: systemPrompt });
+
+//     // 🧠 Call Together AI or any LLM
+//     // const payload = {
+//     //   model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+//     //   temperature: 0.3,
+//     //   messages,
+//     // };
+
+//     // const aiResponse = await axios.post(
+//     //   "https://api.together.xyz/v1/chat/completions",
+//     //   payload,
+//     //   {
+//     //     headers: {
+//     //       Authorization: `Bearer ${TOGETHER_AI_API_KEY}`,
+//     //       "Content-Type": "application/json",
+//     //     },
+//     //   }
+//     // );
+//     const payload = {
+//       model: "gpt-4.1",
+//       temperature: 0.3,
+//       messages,
+//     };
+
+//     const aiResponse = await axios.post(
+//       "https://api.openai.com/v1/chat/completions",
+//       payload,
+//       {
+//         headers: {
+//           Authorization: `Bearer abc`,
+//           "Content-Type": "application/json",
+//         },
+//       }
+//     );
+
+//     // const botMessage = aiResponse.data?.choices?.[0]?.message?.content?.trim();
+
+//     let botMessage = aiResponse.data?.choices?.[0]?.message?.content?.trim();
+// botMessage = formatAIResponse(botMessage);
+
+//     if (!botMessage) {
+//       return res.status(500).json({ error: "Invalid AI response" });
+//     }
+
+//     const newMessages = [
+//       { sender: "user", text: message },
+//       { sender: "bot", text: botMessage },
+//     ];
+
+//     const chatTitle =
+//       message.length > 25 ? message.slice(0, 25) + "..." : message;
+
+//     const existingChatDoc = await Chat.findOne(
+//       { userEmail, "chats.id": chatId },
+//       { "chats.$": 1 }
+//     );
+//     const existingChat1 = existingChatDoc?.chats?.[0];
+
+//     const updateQuery = {
+//       $push: { "chats.$.messages": { $each: newMessages } },
+//     };
+
+//     if (!existingChat1?.name) {
+//       updateQuery.$set = { "chats.$.name": chatTitle };
+//     }
+
+//     const updateResult = await Chat.updateOne(
+//       { userEmail, "chats.id": chatId },
+//       updateQuery
+//     );
+
+//     if (updateResult.matchedCount === 0) {
+//       await Chat.updateOne(
+//         { userEmail },
+//         {
+//           $push: {
+//             chats: {
+//               id: chatId,
+//               name: chatTitle,
+//               messages: newMessages,
+//               isTemp: false,
+//               createdAt: new Date(),
+//             },
+//           },
+//         },
+//         { upsert: true }
+//       );
+//     }
+
+//     res.json({ response: botMessage });
+//   } catch (error) {
+//     console.error("❌ Chat Error:", error.response?.data || error.message);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
 
 const chatHistoryShared = {};
 

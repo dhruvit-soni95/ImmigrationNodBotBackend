@@ -7,7 +7,7 @@ const questionSchema = new mongoose.Schema({
 });
 
 const testTopicSchema = new mongoose.Schema({
-  topic: { type: String, required: true, enum: ["immigration", "study", "work"] },
+  topic: { type: String, required: true, enum: ["immigration", "canada study permit", "work"] },
   questions: [questionSchema],
   createdAt: { type: Date, default: Date.now },
 });

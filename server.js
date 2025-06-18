@@ -8,7 +8,9 @@ setupGlobals().then(() => {
   const connectDB = require("./db");
   const authRoutes = require("./routes/auth");
   const chatRoutes = require("./routes/chat");
-  // const testRoutes = require("./routes/Test");
+  const testRoutes = require("./routes/Test");
+  const { preloadPDFs } = require("./utils/pdfCache");
+
   const User = require("./models/user");
 
   const Stripe = require("stripe");
@@ -20,16 +22,16 @@ setupGlobals().then(() => {
   app.use(express.json());
 
   const cron = require("node-cron");
-  const downloadLatestPdf = require("./downloadLatestPdf");
+  // const downloadLatestPdf = require("./downloadLatestPdf");
 
-  (async () => {
-    try {
-      await downloadLatestPdf();
-      // console.log("✅ PDF downloaded successfully.");
-    } catch (err) {
-      console.error("❌ PDF download failed:", err.message);
-    }
-  })();
+  // (async () => {
+  //   try {
+  //     await downloadLatestPdf();
+  //     // console.log("✅ PDF downloaded successfully.");
+  //   } catch (err) {
+  //     console.error("❌ PDF download failed:", err.message);
+  //   }
+  // })();
 
   require("./routes/passport"); // Load strategies
   const session = require("express-session");
@@ -43,13 +45,16 @@ setupGlobals().then(() => {
     })
   );
 
+  // const { loadCacheFromFile } = require("./utils/tavily");
+  // loadCacheFromFile(); // ✅ Load cache when server starts
+
   app.use(passport.initialize());
   app.use(passport.session());
 
   // Routes
   app.use("/api/auth", authRoutes);
   app.use("/api", chatRoutes);
-  // app.use("/test", testRoutes);
+  app.use("/test", testRoutes);
 
   app.post("/api/user/saveDeveloperToken", async (req, res) => {
     const { userEmail, token } = req.body;
@@ -112,7 +117,14 @@ setupGlobals().then(() => {
 
   // Start server
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
-    // console.log(`🚀 Server running on port ${PORT}`);
-  });
+  // app.listen(PORT, () => {
+  //   // console.log(`🚀 Server running on port ${PORT}`);
+  // });
+
+  (async () => {
+    await preloadPDFs();
+    app.listen(5000, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+  })();
 });

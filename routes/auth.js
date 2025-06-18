@@ -19,8 +19,8 @@ const transporter = nodemailer.createTransport({
 const bodyParser = require("body-parser");
 const Stripe = require('stripe');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
-const YOUTUBE_API_KEY = 'AIzaSyANtFlnweaSbUbDzNqn_5Het4Q7ZaK803w';
-const CX = "15c8815bd276e49c9"; // From Programmable Search Engine
+const YOUTUBE_API_KEY = 'abc';
+const CX = "abc"; // From Programmable Search Engine
 
 // Initiate Google login
 router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
@@ -639,7 +639,7 @@ router.post("/login", async (req, res) => {
 
   try {
     // ✅ Verify reCAPTCHA with Google
-    const secretKey = '6LfOHF8rAAAAAG1f1L1xtGIFY4iRt1chwLAMODPY';
+    const secretKey = 'abc';
     const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${recaptchaToken}`;
 
     const captchaResponse = await axios.post(verifyUrl);
