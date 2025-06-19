@@ -20,7 +20,14 @@ const bodyParser = require("body-parser");
 const Stripe = require('stripe');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const YOUTUBE_API_KEY = 'abc';
-const CX = "abc"; // From Programmable Search Engine
+
+// const live_Server1 = "https://www.immigrategpt.ca/signup"
+// const live_Server2 = "https://www.immigrategpt.ca/signup?error=oauth_failed"
+const GOOGLE_API_KEY = "abc";
+const GOOGLE_CX = "abc";
+const Server1 = "http://localhost:3000/signup"
+const Server2 = "http://localhost:3000/signup?error=oauth_failed"
+const reCaptcha_secret_key = 'abc'
 
 // Initiate Google login
 router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
@@ -29,7 +36,7 @@ router.get("/google", passport.authenticate("google", { scope: ["profile", "emai
 router.get(
   "/google/callback",
   passport.authenticate("google", {
-    failureRedirect: "https://www.immigrategpt.ca/signup", // Redirect if auth fails
+    failureRedirect: Server1, // Redirect if auth fails
     // failureRedirect: "http://localhost:3000/signup", // Redirect if auth fails
     session: false, // Important: disable session if using JWT
   }),
@@ -51,7 +58,7 @@ router.get(
       // );
     } catch (err) {
       console.error("OAuth callback error:", err);
-      res.redirect("https://www.immigrategpt.ca/signup?error=oauth_failed");
+      res.redirect(Server2);
       // res.redirect("http://localhost:3000/signup?error=oauth_failed");
     }
   }
@@ -66,7 +73,7 @@ router.get("/facebook", passport.authenticate("facebook", { scope: ["email"] }))
 router.get(
   "/facebook/callback",
   passport.authenticate("facebook", {
-    failureRedirect: "https://www.immigrategpt.ca/signup",
+    failureRedirect: Server1,
     // failureRedirect: "http://localhost:3000/signup",
     session: false,
   }),
@@ -86,7 +93,7 @@ router.get(
       // );
     } catch (err) {
       console.error("OAuth callback error:", err);
-      res.redirect("https://www.immigrategpt.ca/signup?error=oauth_failed");
+      res.redirect(Server2);
       // res.redirect("http://localhost:3000/signup?error=oauth_failed");
     }
   }
@@ -104,7 +111,7 @@ router.get(
 router.get(
   "/linkedin/callback",
   passport.authenticate("linkedin", {
-    failureRedirect: "https://www.immigrategpt.ca/signup",
+    failureRedirect: Server1,
     session: false,
   }),
   (req, res) => {
@@ -120,7 +127,7 @@ router.get(
       );
     } catch (err) {
       console.error("LinkedIn OAuth callback error:", err);
-      res.redirect("https://www.immigrategpt.ca/signup?error=oauth_failed");
+      res.redirect(Server2);
     }
   }
 );
@@ -128,14 +135,14 @@ router.get(
 
 // Redirect user to Microsoft login
 router.get('/microsoft', passport.authenticate('azuread-openidconnect', {
-  failureRedirect: 'https://www.immigrategpt.ca/signup',
+  failureRedirect: Server1,
   // failureRedirect: 'http://localhost:3000/signup',
 }));
 
 // Callback route after Microsoft login
 router.get('/microsoft/callback',
   passport.authenticate('azuread-openidconnect', {
-    failureRedirect: 'https://www.immigrategpt.ca/signup',
+    failureRedirect: Server1,
     // failureRedirect: 'http://localhost:3000/signup',
     session: false,
   }),
@@ -151,7 +158,7 @@ router.get('/microsoft/callback',
       // res.redirect(`http://localhost:3000/oauth-success?token=${token}&plan=${req.user.plan}&email=${req.user.email}`);
     } catch (err) {
       console.error('OAuth callback error:', err);
-      res.redirect('https://www.immigrategpt.ca/signup?error=oauth_failed');
+      res.redirect(Server2);
       // res.redirect('http://localhost:3000/signup?error=oauth_failed');
     }
   }
@@ -264,7 +271,7 @@ router.get('/validate/videos', async (req, res) => {
 
   const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(
     query
-  )}&cx=${CX}&key=${GOOGLE_API_KEY}`;
+  )}&cx=${GOOGLE_CX}&key=${GOOGLE_API_KEY}`;
 
   try {
     const response = await fetch(url);
@@ -639,7 +646,7 @@ router.post("/login", async (req, res) => {
 
   try {
     // ✅ Verify reCAPTCHA with Google
-    const secretKey = 'abc';
+    const secretKey = reCaptcha_secret_key;
     const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${recaptchaToken}`;
 
     const captchaResponse = await axios.post(verifyUrl);

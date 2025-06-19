@@ -2,7 +2,7 @@
 const axios = require("axios");
 const TavilyCache = require("../models/TavilyCache");
 
-const TAVILY_API_KEY = "abc";
+const TAVILY_API_KEY = "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";
 
 function normalizeQuery(query) {
   return query.trim().toLowerCase();

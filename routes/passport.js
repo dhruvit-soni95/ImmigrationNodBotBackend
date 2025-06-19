@@ -23,14 +23,26 @@ const generateUniqueRandomMobile = async () => {
   return mobile;
 };
 
+const GOOGLE_CLIENT_ID='abc'
+const GOOGLE_CLIENT_SECRET='abc'
+const google_URL =  "https://www.immigrategpt.ca/api/auth/google/callback"
+
+const FACEBOOK_CLIENT_ID='abc'
+const FACEBOOK_CLIENT_SECRET='abc'
+const facebook_URL = "www.immigrategpt.ca/api/auth/facebook/callback"
+
+const Microsoft_clientID= "acb"
+const Microsoft_clientSecret= "abc"
+const Microsoft_URL = 'http://localhost:5000/api/auth/microsoft/callback'
+
 // Google Strategy
 passport.use(
   new GoogleStrategy(
     {
       clientID:
-        "abc",
-      clientSecret: "abc",
-      callbackURL: "/api/auth/google/callback",
+        GOOGLE_CLIENT_ID,
+      clientSecret: GOOGLE_CLIENT_SECRET,
+      callbackURL: google_URL,
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -63,9 +75,9 @@ passport.use(
 passport.use(
   new FacebookStrategy(
     {
-      clientID: "abc",
-      clientSecret: "abc",
-      callbackURL: "/api/auth/facebook/callback",
+      clientID: FACEBOOK_CLIENT_ID,
+      clientSecret: FACEBOOK_CLIENT_SECRET,
+      callbackURL: facebook_URL,
       profileFields: ["id", "displayName", "emails"],
     },
     async (accessToken, refreshToken, profile, done) => {
@@ -134,11 +146,11 @@ const { OIDCStrategy } = require('passport-azure-ad');
 
 passport.use(new OIDCStrategy({
   identityMetadata: 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
-  clientID: "abc",
-  clientSecret: "abc",
+  clientID: Microsoft_clientID,
+  clientSecret: Microsoft_clientSecret,
   responseType: 'code',
   responseMode: 'query',
-  redirectUrl: 'http://localhost:5000/api/auth/microsoft/callback',
+  redirectUrl: Microsoft_URL,
   allowHttpForRedirectUrl: true,
   scope: ['openid', 'profile', 'email'],
   passReqToCallback: false,

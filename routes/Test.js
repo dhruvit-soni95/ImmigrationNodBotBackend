@@ -6,13 +6,12 @@ const fs = require("fs");
 const pdfParse = require("pdf-parse");
 const axios = require("axios");
 const router = express.Router();
-// const cheerio = require("cheerio");
 const TOGETHER_AI_API_KEY =
   "ccd534e23377572759c4e3e037acd8af56412ae39cca3c80b75d61a5d846092f";
 const cheerio = require("cheerio");
-// global.ReadableStream = require("web-streams-polyfill/ponyfill").ReadableStream;
 
-// const TestTopic = require("./models/TestTopic"); // make sure model path is correct
+const GOOGLE_API_KEY = "abc";
+const GOOGLE_CX = "abc";
 
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
@@ -29,7 +28,186 @@ const normalizeUrl = (url) => {
   }
 };
 
-// Google search: top 1 deduplicated link
+// // Google search: top 1 deduplicated link
+// const fetchFromGoogle = async (queryText, API_KEY, CX) => {
+//   const query = encodeURIComponent(queryText);
+//   const res = await fetch(
+//     `https://www.googleapis.com/customsearch/v1?q=${query}&key=${API_KEY}&cx=${CX}`
+//   );
+//   const data = await res.json();
+//   if (!data.items) return [];
+
+//   const seen = new Set();
+//   const filtered = data.items
+//     .map((item) => ({ title: item.title, url: item.link }))
+//     .filter((item) => {
+//       const normalized = normalizeUrl(item.url);
+//       if (seen.has(normalized)) return false;
+//       seen.add(normalized);
+//       return true;
+//     });
+
+//   return filtered.slice(0, 1);
+// };
+
+// // Extract body text from page
+// const scrapeWebpageText = async (url) => {
+//   const page = await axios.get(url);
+//   const $ = cheerio.load(page.data);
+//   $("script, style, noscript").remove();
+//   return $("body").text().replace(/\s+/g, " ").trim().slice(0, 4000);
+// };
+
+// // ✅ Main route
+// router.post("/api/generate-questions", async (req, res) => {
+//   try {
+//     const { topic, sourceType, url } = req.body;
+//     const API_KEY = GOOGLE_API_KEY;
+//     const CX = GOOGLE_CX;
+//     // const API_KEY = process.env.GOOGLE_API_KEY;
+//     // const CX = process.env.GOOGLE_CX;
+
+//     // Validate topic
+//     // const allowedTopics = ["immigration", "canada study permit", "work"];
+//     const allowedTopics = [
+//       "immigration",
+//       "canada study permit",
+//       "work",
+//       "express entry",
+//       "permanent residency",
+//       "visitor visa",
+//       "post graduate work permit",
+//       "lmia",
+//       "open work permit",
+//       "provincial nominee program",
+//       "citizenship",
+//       "refugee",
+//       "family sponsorship",
+//       "spousal sponsorship",
+//       "rural and northern immigration pilot",
+//       "atlantic immigration program",
+//       "startup visa",
+//       "super visa",
+//     ];
+
+//     if (!allowedTopics.includes(topic)) {
+//       return res.status(400).json({ error: "Invalid topic provided" });
+//     }
+
+//     let text = "";
+
+//     if (sourceType === "url") {
+//       if (!url) return res.status(400).json({ error: "URL is required" });
+//       text = await scrapeWebpageText(url);
+//     } else if (sourceType === "google") {
+//       const results = await fetchFromGoogle(topic, API_KEY, CX);
+//       if (!results.length)
+//         return res.status(404).json({ error: "No search results found" });
+
+//       text = await scrapeWebpageText(results[0].url);
+//     } else {
+//       return res.status(400).json({
+//         error: "Invalid sourceType (must be 'url' or 'google')",
+//       });
+//     }
+
+//     const prompt = `
+// You are an exam creator. Based on the following text, generate 10 multiple-choice questions.
+
+// Format:
+// Each question should be a JSON object like this:
+// {
+//   "question": "Your question here?",
+//   "options": ["Option A", "Option B", "Option C", "Option D"],
+//   "answer": "One of the options exactly"
+// }
+
+// Requirements:
+// - "answer" must match EXACTLY one of the options.
+// - Only return the JSON array (no explanation).
+
+// TEXT:
+// """${text}"""
+// `;
+
+//     const apiRes = await axios.post(
+//       "https://api.together.xyz/v1/chat/completions",
+//       {
+//         model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+//         temperature: 0.3,
+//         messages: [
+//           { role: "system", content: "You generate test questions" },
+//           { role: "user", content: prompt },
+//         ],
+//       },
+//       {
+//         headers: {
+//           Authorization: `Bearer ${TOGETHER_AI_API_KEY}`,
+//           "Content-Type": "application/json",
+//         },
+//       }
+//     );
+
+//     const content = apiRes.data.choices?.[0]?.message?.content;
+//     const match = content.match(/\[\s*{[\s\S]*}\s*\]/);
+//     if (!match)
+//       throw new Error(
+//         "Failed to extract valid JSON array from model response."
+//       );
+
+//     const parsedQuestions = JSON.parse(match[0]);
+
+//     const questions = parsedQuestions.map((q, i) => {
+//       if (!q.answer && q.correct_answer) q.answer = q.correct_answer;
+
+//       if (
+//         !q.question ||
+//         !q.options ||
+//         !q.answer ||
+//         !Array.isArray(q.options) ||
+//         !q.options.includes(q.answer)
+//       ) {
+//         throw new Error(`Invalid question format at index ${i + 1}`);
+//       }
+
+//       return {
+//         question: q.question.trim(),
+//         options: q.options.map((opt) => opt.trim()),
+//         answer: q.answer.trim(),
+//       };
+//     });
+
+//     const doc = await TestTopic.findOneAndUpdate(
+//       { topic },
+//       { $push: { questions: { $each: questions } } },
+//       { upsert: true, new: true }
+//     );
+
+//     res.json({ success: true, savedCount: questions.length, doc });
+//   } catch (err) {
+//     console.error("🚨 Error:", err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+
+
+
+
+
+// ✅ Validate question structure
+const validateQuestion = (q) => {
+  return (
+    q &&
+    typeof q.question === "string" &&
+    Array.isArray(q.options) &&
+    q.options.length >= 2 &&
+    typeof q.answer === "string" &&
+    q.options.includes(q.answer)
+  );
+};
+
+// ✅ Google search: top 1 deduplicated link
 const fetchFromGoogle = async (queryText, API_KEY, CX) => {
   const query = encodeURIComponent(queryText);
   const res = await fetch(
@@ -51,7 +229,7 @@ const fetchFromGoogle = async (queryText, API_KEY, CX) => {
   return filtered.slice(0, 1);
 };
 
-// Extract body text from page
+// ✅ Extract body text from page
 const scrapeWebpageText = async (url) => {
   const page = await axios.get(url);
   const $ = cheerio.load(page.data);
@@ -63,13 +241,30 @@ const scrapeWebpageText = async (url) => {
 router.post("/api/generate-questions", async (req, res) => {
   try {
     const { topic, sourceType, url } = req.body;
-    const API_KEY = "abc";
-    const CX = "abc";
-    // const API_KEY = process.env.GOOGLE_API_KEY;
-    // const CX = process.env.GOOGLE_CX;
+    const API_KEY = GOOGLE_API_KEY;
+    const CX = GOOGLE_CX;
 
-    // Validate topic
-    const allowedTopics = ["immigration", "canada study permit", "work"];
+    const allowedTopics = [
+      "immigration",
+      "canada study permit",
+      "work",
+      "express entry",
+      "permanent residency",
+      "visitor visa",
+      "post graduate work permit",
+      "lmia",
+      "open work permit",
+      "provincial nominee program",
+      "citizenship",
+      "refugee",
+      "family sponsorship",
+      "spousal sponsorship",
+      "rural and northern immigration pilot",
+      "atlantic immigration program",
+      "startup visa",
+      "super visa",
+    ];
+
     if (!allowedTopics.includes(topic)) {
       return res.status(400).json({ error: "Invalid topic provided" });
     }
@@ -131,22 +326,20 @@ TEXT:
     const content = apiRes.data.choices?.[0]?.message?.content;
     const match = content.match(/\[\s*{[\s\S]*}\s*\]/);
     if (!match)
-      throw new Error(
-        "Failed to extract valid JSON array from model response."
-      );
+      throw new Error("Failed to extract valid JSON array from model response.");
 
-    const parsedQuestions = JSON.parse(match[0]);
+    let parsedQuestions;
+    try {
+      parsedQuestions = JSON.parse(match[0]);
+    } catch (err) {
+      throw new Error("Invalid JSON format returned by the model.");
+    }
 
+    // ✅ Validate and clean questions
     const questions = parsedQuestions.map((q, i) => {
       if (!q.answer && q.correct_answer) q.answer = q.correct_answer;
 
-      if (
-        !q.question ||
-        !q.options ||
-        !q.answer ||
-        !Array.isArray(q.options) ||
-        !q.options.includes(q.answer)
-      ) {
+      if (!validateQuestion(q)) {
         throw new Error(`Invalid question format at index ${i + 1}`);
       }
 
@@ -157,6 +350,7 @@ TEXT:
       };
     });
 
+    // ✅ Save to DB
     const doc = await TestTopic.findOneAndUpdate(
       { topic },
       { $push: { questions: { $each: questions } } },
@@ -169,6 +363,22 @@ TEXT:
     res.status(500).json({ error: err.message });
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // // 🔥 Main route
 // router.post("/api/generate-questions", async (req, res) => {

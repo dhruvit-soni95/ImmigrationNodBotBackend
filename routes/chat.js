@@ -1,10 +1,5 @@
 const express = require("express");
 const axios = require("axios");
-// const cors = require("cors");
-// const mongoose = require("mongoose");
-// const app = express();
-
-// const OpenAI = require("openai");
 
 const pdfParse = require("pdf-parse");
 const path = require("path");
@@ -13,8 +8,6 @@ const fs = require("fs");
 const router = express.Router();
 
 require("dotenv").config();
-// const connectDB = require("../db");
-// const crypto = require("crypto");
 const Chat = require("../models/Chat"); // ⬅️ MongoDB model
 const User = require("../models/user");
 
@@ -23,18 +16,22 @@ const { getTavilyWebContext } = require("../utils/tavily");
 const { getCacheEntries } = require("../utils/tavily");
 
 const Stripe = require("stripe");
-// const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
-const GOOGLE_API_KEY = "abc";
-const GOOGLE_CX = "abc";
 const TOGETHER_AI_API_KEY =
   "ccd534e23377572759c4e3e037acd8af56412ae39cca3c80b75d61a5d846092f";
+const GOOGLE_API_KEY = "abc";
+const GOOGLE_CX = "abc";
+
+const NEW_GOOGLE_API_KEY = "abc";
+const NEW_GOOGLE_CX = "abc";
+
+TAVILY_API_KEY = "abc";
+const openai_key =
+  "abc";
 
 const fsPromises = require("fs/promises");
 // Store conversation history per chatId
 const chatHistory = {};
-
-TAVILY_API_KEY = "abc";
 
 // 🧠 Get Tavily web search results
 // async function getTavilyWebContext(query) {
@@ -232,24 +229,6 @@ async function fetchGoogleSearchSnippets(query) {
   }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // const getRelatedLinks = async (mainUrl, API_KEY, CX) => {
 
 //   try {
@@ -323,12 +302,12 @@ const getRelatedLinks = async (mainUrl, API_KEY, CX) => {
     //   return cached.related.map((r) => ({ ...r, source: "cache" }));
     // }
     if (cached && cached.related?.length > 0) {
-  return cached.related.map(({ title, url }) => ({
-    title,
-    url,
-    source: "cache",
-  }));
-}
+      return cached.related.map(({ title, url }) => ({
+        title,
+        url,
+        source: "cache",
+      }));
+    }
 
     // 🌐 Step 2: Try from Google API
     const related = await fetchFromGoogle(mainUrl, API_KEY, CX);
@@ -351,20 +330,20 @@ const getRelatedLinks = async (mainUrl, API_KEY, CX) => {
   //   return fallback.related.map((r) => ({ ...r, source: "cache" }));
   // }
   if (fallback && fallback.related?.length > 0) {
-  return fallback.related.map(({ title, url }) => ({
-    title,
-    url,
-    source: "cache",
-  }));
-}
+    return fallback.related.map(({ title, url }) => ({
+      title,
+      url,
+      source: "cache",
+    }));
+  }
 
   return [];
 };
 
 router.get("/related-links", async (req, res) => {
   const { url } = req.query;
-  const API_KEY = "abc";
-  const CX = "abc";
+  const API_KEY = NEW_GOOGLE_API_KEY;
+  const CX = NEW_GOOGLE_CX;
   if (!url) return res.status(400).json({ error: "Missing URL" });
   try {
     const links = await getRelatedLinks(url, API_KEY, CX);
@@ -376,9 +355,16 @@ router.get("/related-links", async (req, res) => {
 });
 
 
-// what i thnk that main url sometime not same right? may differs 
+const today = new Date();
+const year = today.getFullYear();
+const month = String(today.getMonth() + 1).padStart(2, '0');
+const day = String(today.getDate()).padStart(2, '0');
+const formattedDate = `${year}-${month}-${day}`; // e.g., "2025-06-19"
+
+console.log(formattedDate); // Output: e.g., "2025-06-19"
 
 
+// what i thnk that main url sometime not same right? may differs
 
 // async function fetchRelevantPdfContent(query) {
 //   try {
@@ -642,7 +628,9 @@ router.post("/chat", async (req, res) => {
     const { message, chatId, userEmail } = req.body;
 
     if (!message || !chatId || !userEmail) {
-      return res.status(400).json({ error: "Missing message, chatId, or userEmail" });
+      return res
+        .status(400)
+        .json({ error: "Missing message, chatId, or userEmail" });
     }
 
     // ✅ Get previous chat history
@@ -664,9 +652,10 @@ router.post("/chat", async (req, res) => {
 
     // ✅ Determine small talk
     const lowerMsg = message.toLowerCase().trim();
-    const isSmallTalk = ["hi", "hello", "hey", "how are you", "good morning", "good night"].some(
-      (greet) => lowerMsg.includes(greet)
-    ) || lowerMsg.length < 8;
+    const isSmallTalk =
+      ["hi", "hello", "hey", "how are you", "good morning", "good night"].some(
+        (greet) => lowerMsg.includes(greet)
+      ) || lowerMsg.length < 8;
 
     // ✅ Trim previous messages to the last 10
     const trimmedMessages = messages.slice(-10);
@@ -675,7 +664,9 @@ router.post("/chat", async (req, res) => {
     if (!isSmallTalk && (webContext || pdfContext)) {
       trimmedMessages.push({
         role: "assistant",
-        content: `📘 Web Info:\n${webContext || "N/A"}\n\n📄 PDF Info:\n${pdfContext || "N/A"}`,
+        content: `📘 Web Info:\n${webContext || "N/A"}\n\n📄 PDF Info:\n${
+          pdfContext || "N/A"
+        }`,
       });
     }
 
@@ -685,7 +676,9 @@ router.post("/chat", async (req, res) => {
     // ✅ Add short system prompt (bot identity)
     trimmedMessages.unshift({
       role: "system",
-      content: "You are ImmigrateGPT, a helpful assistant that answers only Canadian immigration-related questions using up-to-date information. Respond professionally.",
+      // content:"today's date is ${formattedDate}.You are ImmigrateGPT, a helpful assistant that answers only Canadian immigration-related questions using up-to-date information. Respond professionally.",
+        content: `You are ImmigrateGPT, a helpful assistant that answers only Canadian immigration-related questions using up-to-date information as of ${formattedDate}. Respond professionally.`,
+
     });
 
     // ✅ Send to OpenAI
@@ -695,12 +688,16 @@ router.post("/chat", async (req, res) => {
       messages: trimmedMessages,
     };
 
-    const aiResponse = await axios.post("https://api.openai.com/v1/chat/completions", payload, {
-      headers: {
-        Authorization: `Bearer abc`,
-        "Content-Type": "application/json",
-      },
-    });
+    const aiResponse = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${openai_key}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
     let botMessage = aiResponse.data?.choices?.[0]?.message?.content?.trim();
     botMessage = formatAIResponse(botMessage); // Optional: format as steps/bullets
@@ -715,7 +712,8 @@ router.post("/chat", async (req, res) => {
       { sender: "bot", text: botMessage },
     ];
 
-    const chatTitle = message.length > 25 ? message.slice(0, 25) + "..." : message;
+    const chatTitle =
+      message.length > 25 ? message.slice(0, 25) + "..." : message;
 
     const existingChatDoc = await Chat.findOne(
       { userEmail, "chats.id": chatId },
@@ -731,7 +729,10 @@ router.post("/chat", async (req, res) => {
       updateQuery.$set = { "chats.$.name": chatTitle };
     }
 
-    const updateResult = await Chat.updateOne({ userEmail, "chats.id": chatId }, updateQuery);
+    const updateResult = await Chat.updateOne(
+      { userEmail, "chats.id": chatId },
+      updateQuery
+    );
 
     if (updateResult.matchedCount === 0) {
       await Chat.updateOne(
@@ -757,38 +758,6 @@ router.post("/chat", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // router.post("/chat", async (req, res) => {
 //   try {
